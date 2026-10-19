@@ -6,14 +6,14 @@
 > 
 > 2. **Phase Routing & Strict Scope Isolation (CRITICAL)**:
 >    - You must first determine which phase the current task belongs to:
->      * **Phase 1 (Proposal)**: Strictly reference `docs/utar/proposal/guidelines.md` & `template.md`.
->      * **Phase 2 (FYP 1)**: Strictly reference `docs/utar/fyp1/guidelines.md` & `template.md`.
->      * **Phase 3 (FYP 2)**: Strictly reference `docs/utar/fyp2/guidelines.md` & `template.md`.
+>      * **Phase 1 (Proposal)**: Strictly reference `docs/context/proposal/guidelines.md` & `template.md`.
+>      * **Phase 2 (FYP 1)**: Strictly reference `docs/context/fyp1/guidelines.md` & `template.md`.
+>      * **Phase 3 (FYP 2)**: Strictly reference `docs/context/fyp2/guidelines.md` & `template.md`.
 >    - **DO NOT CROSS-CONTAMINATE**: When generating content for one phase, NEVER mix chapter numbering, templates, or marking rubrics from another phase (e.g., do not pull FYP2 evaluation requirements into FYP1).
 > 
 > 3. **Execution Workflow**:
 >    - Step 1: Read Section 1 of this file for global formatting (margins, font, IEEE citations).
->    - Step 2: Read ONLY the target phase's directory (`docs/utar/<target-phase>/`).
+>    - Step 2: Read ONLY the target phase's directory (`docs/context/<target-phase>/`).
 
 
 ---
@@ -31,7 +31,7 @@ All generated documents must strictly adhere to the following baseline rules:
 ---
 
 ## 2. Phase 1: IIPSPW (Preliminary Proposal)
-**Docs**: `docs/utar/proposal/guidelines.md`, `docs/utar/proposal/template.md`
+**Docs**: `docs/context/proposal/guidelines.md`, `docs/context/proposal/template.md`
 **Goal**: Define the problem, literature, scope, and initial methodology.
 
 ### 2.1 Structure
@@ -45,7 +45,7 @@ All generated documents must strictly adhere to the following baseline rules:
 ---
 
 ## 3. Phase 2: FYP 1 (System Design & Preliminary Work)
-**Docs**: `docs/utar/fyp1/guidelines.md`, `docs/utar/fyp1/template.md`
+**Docs**: `docs/context/fyp1/guidelines.md`, `docs/context/fyp1/template.md`
 **Goal**: Solidify the system design, complete preliminary data ingestion/setup, and prepare for full implementation.
 
 ### 3.1 Marking Scheme
@@ -64,7 +64,7 @@ All generated documents must strictly adhere to the following baseline rules:
 ---
 
 ## 4. Phase 3: FYP 2 (Implementation, Testing & Evaluation)
-**Docs**: `docs/utar/fyp2/guidelines.md`, `docs/utar/fyp2/template.md`
+**Docs**: `docs/context/fyp2/guidelines.md`, `docs/context/fyp2/template.md`
 **Goal**: Fully realize the architecture, perform data transformations, optimize queries, and evaluate pipeline performance.
 
 ### 4.1 Marking Scheme
