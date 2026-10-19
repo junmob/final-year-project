@@ -1,0 +1,17 @@
+============================================================
+运营商: rapid-bus-kl
+HTTP 状态码: 200, 文件大小: 0.0 KB
+在线车辆数: 0
+============================================================
+运营商: rapid-bus-mrtfeeder
+HTTP 状态码: 200, 文件大小: 0.1 KB
+在线车辆数: 1
+所有字段: ['timestamp', 'trip.tripId', 'trip.routeId', 'position.latitude', 'position.longitude', 'position.bearing', 'position.speed', 'vehicle.id', 'vehicle.licensePlate']
+    timestamp     trip.tripId trip.routeId  position.latitude  position.longitude  position.bearing  position.speed vehicle.id vehicle.licensePlate
+0  1886017556  241209021024S2         T105           3.206444           101.58082             274.0            13.0    VAL4552              VAL4552
+最新 GPS 时间: 2029-10-06 21:45:56+00:00，最旧: 2029-10-06 21:45:56+00:00
+使用 Static 版本: rapid-bus-mrtfeeder_20261019.zip
+trip.tripId 匹配率: 0.0% (0/1，缺失 0 条)
+   对不上的例子: ['241209021024S2']
+trip.routeId 匹配率: 0.0% (0/1，缺失 0 条)
+   对不上的例子: ['T105']

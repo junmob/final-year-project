@@ -1,0 +1,2 @@
+timestamp,trip.tripId,trip.routeId,position.latitude,position.longitude,position.bearing,position.speed,vehicle.id,vehicle.licensePlate
+1886017556,241209021024S2,T105,3.206444,101.58082,274.0,13.0,VAL4552,VAL4552
