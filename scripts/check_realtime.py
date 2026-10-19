@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = ROOT / "data" / "raw" / "gtfs_static"
-RT_DIR = ROOT / "data" / "raw" / "gtfs_realtime"
+RT_DIR = ROOT / "docs" / "evidence" / "realtime_probe"  # 一次性实测证据，不是长期采集的 Bronze 数据
 RT_DIR.mkdir(parents=True, exist_ok=True)
 FEEDS = ["rapid-bus-kl", "rapid-bus-mrtfeeder"]
 BASE = "https://api.data.gov.my/gtfs-realtime/vehicle-position/prasarana?category="
