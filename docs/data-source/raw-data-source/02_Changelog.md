@@ -1,0 +1,46 @@
+# 1.6.0 (2025-10-13)
+**GTFS Realtime API Update**
+
+Updated [GTFS Realtime API]() with new endpoint for BAS.MY services in Melaka
+
+# 1.5.0 (2025-10-10)
+**GTFS Realtime API Update**
+
+Updated [GTFS Realtime API]() with new endpoints for BAS.MY services in 5 cities (Kangar, Alor Setar, Kota Bharu, Kuala Terengganu, Kuching)
+
+# 1.4.0 (2024-04-01)
+**GTFS Realtime API Update**
+
+Updated [GTFS Realtime API]() with new endpoint for MRT Feeder Bus services
+
+# 1.3.0 (2023-11-14)
+**GTFS Realtime API Release**
+
+Launched [GTFS Realtime API]() with data from myBAS Johor Bahru, KTMB and Prasarana with the following endpoints:
+* `gtfs-realtime/vehicle-position/mybas-johor` for downloading myBAS GTFS-R `.proto` file.
+* `gtfs-realtime/vehicle-position/ktmb` for downloading KTMB GTFS-R `.proto` file.
+* `gtfs-realtime/vehicle-position/prasarana?category=<category>` for downloading Prasarana GTFS-R `.proto` file.
+
+# 1.2.0 (2023-11-06)
+**GTFS Static API Release**
+
+Launched [GTFS Static API]() with data from myBAS Johor Bahru, KTMB and Prasarana with the following endpoints:
+* `gtfs-static/mybas-johor` for downloading myBAS GTFS ZIP file.
+* `gtfs-static/ktmb` for downloading KTMB GTFS ZIP file.
+* `gtfs-static/prasarana?category=<category>` for downloading Prasarana GTFS ZIP file.
+
+# 1.1.0 (2023-10-09)
+**Weather API Release**
+
+Launched [Weather API]() with data from [MET Malaysia](https://www.met.gov.my/) with the following endpoints:
+* `/weather/forecast` for accessing 7 day general forecast data.
+* `/weather/warning` for accessing realtime weather warning data.
+* `/weather/warning/earthquake` for accessing earthquake warning data.
+
+# 1.0.0 (2023-09-13)
+
+**Initial Release**
+* Launched Malaysia's OpenAPI with the following endpoints:
+    * `/data-catalogue` for accessing full data catalogue.
+    * `/opendosm` for accessing OpenDOSM specific data catalogue.
+    * `/flood-warning` for accessing realtime flood warning data.

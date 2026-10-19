@@ -1,0 +1,12 @@
+# OpenAPI Documentation
+Welcome to the documentation for the Open API of Malaysia's official open data portal! This comprehensive guide is designed to provide you with all the information you need to effectively utilize the Open API developed by the Malaysian government. Whether you are a developer, data scientist, or a citizen interested in accessing transparent data, this documentation will serve as your guide to leveraging the power of the Open API.
+
+# What is the Open API?
+The Open API built by the Malaysian government is a RESTful API that utilizes the Django framework. This API has been developed with the objective of providing transparent data access to all citizens, with the following goals in mind:
+
+- Transparent Data Access: The API provides a user-friendly way to access a wide range of data sets, promoting transparency and enabling informed decision-making.
+- Ease of Use: The API is designed to be straightforward and easy to understand, ensuring that users can retrieve data efficiently without unnecessary complexity.
+- Diverse Data Sets: The Open API offers access to various data, allowing users to explore and analyze different aspects of Malaysian society.
+
+# Using the AI Helper
+The AI Helper is created to assist you in finding information within this documentation site. To use it, click the AI Helper button located at the bottom right of the page.

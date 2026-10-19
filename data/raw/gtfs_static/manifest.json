@@ -1,0 +1,14 @@
+{
+  "rapid-bus-kl": {
+    "fingerprint": "c59b1469a5a2bd03727b480fcbc869960bc3565a523cae69b91ec3731be5d53c",
+    "file": "rapid-bus-kl_20261019.zip"
+  },
+  "rapid-bus-mrtfeeder": {
+    "fingerprint": "6106d5927f528cba44a837077e26a7803884b224961bfdd8e5871d69a92187b8",
+    "file": "rapid-bus-mrtfeeder_20261019.zip"
+  },
+  "rapid-rail-kl": {
+    "fingerprint": "c75f7ede6f7f918815a9369bfb41b9cb18b06fbb9fbc885205a023a87d2d03b4",
+    "file": "rapid-rail-kl_20261019.zip"
+  }
+}

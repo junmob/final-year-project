@@ -1,0 +1,10 @@
+# 实时数据体积大，不进版本库；Static ZIP 与 manifest.json 需要提交（GitHub Actions 备份）
+data/raw/gtfs_realtime/
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+# misc
+.env
+.DS_Store

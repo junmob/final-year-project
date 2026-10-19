@@ -1,0 +1,142 @@
+# GTFS Realtime API Endpoint
+```bash
+GET https://api.data.gov.my/gtfs-realtime/<feed>/<agency>
+```
+
+## What does GTFS Realtime do?
+GTFS Realtime is an extension of the [GTFS Static API]() that enables public transportation agencies to share live trip updates, service alerts and vehicle positions. At present, our GTFS Realtime API only offers vehicle position data - service alerts and trip updates are in our pipeline for 2026. For more details on GTFS Realtime and its broader functionalities, please refer to the https://gtfs.org/realtime/.
+
+*Note: The validation errors specific to each feed in the [Vehicle Position](#vehicle-position) section were generated using the [GTFS Realtime Validator](https://github.com/MobilityData/gtfs-realtime-validator).*
+
+## Source of GTFS Realtime Data
+The GTFS Realtime API incorporates data from various transport agencies in Malaysia. We currently feature realtime feeds from the following:
+* [KTMB (Keretapi Tanah Melayu Berhad)](https://www.ktmb.com.my/): A railway operator providing train services across the country.
+* [Prasarana](https://www.myrapid.com.my/): A public transport operator responsible for managing various modes of transportation, including LRT (Light Rail Transit), MRT (Mass Rapid Transit), monorail, and bus services.
+* [BAS.MY](https://www.mybas.my/): Stage bus services across Malaysia, run by various operators. Endpoints for Kangar, Alor Setar, Kota Bharu, Terengganu, Ipoh, Seremban, Melaka, Johor Bahru, and Kuching are currently available.
+
+# Request Query & Response Format
+The GTFS Realtime API adheres to the standard GTFS Realtime protobuf format (`.proto`). The detailed format is available in the [official GTFS Realtime reference](https://gtfs.org/documentation/realtime/proto/), and you can access the protobuf files through the following endpoints:
+
+# Vehicle Position
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/<agency>
+```
+
+It should be noted that continuous validation of realtime bus feeds may raise [E028](https://github.com/MobilityData/gtfs-realtime-validator/blob/master/RULES.md#E028), indicating that the vehicle's reported position falls outside the coverage area defined in the static feed. For buses specifically, users should note that there is no error in the underlying static data. The root cause of the error is occasional erroneous GPS data reported by transponders, resulting in vehicle positions temporarily appearing outside the agency's defined service area.
+
+## Frequency of Data Update
+* All Vehicle Position feeds are updated every **30 seconds**.
+
+## KTMB
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/ktmb
+# .proto file is returned
+```
+
+## Prasarana
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/prasarana?category=<category>
+# .proto file is returned
+```
+
+* Possible `<category>` values are `rapid-bus-kl`, `rapid-bus-mrtfeeder`, `rapid-bus-kuantan` and `rapid-bus-penang`.
+    * `rapid-rail-kl`, for which static endpoint is available, does not yet have stable realtime feeds.
+
+* Known errors affecting rapid-bus-kuantan and rapid-bus-penang:
+    * [E003](https://github.com/MobilityData/gtfs-realtime-validator/blob/master/RULES.md#E003): GTFS-rt `trip_id` does not exist in GTFS data
+    * [E004](https://github.com/MobilityData/gtfs-realtime-validator/blob/master/RULES.md#E004): GTFS-rt `route_id` does not exist in GTFS data
+    * These errors are due to issues with legacy operational systems (some more than a decade old) which cannot support tracking trips and routes properly, yet. Our team is actively working to alleviate these constraints to make the feed meaningful and compliant.
+
+* *Known issue with rapid-bus-penang:
+    * Developers need to match trip IDs in the realtime feed with existing trip IDs in the static schedule. This can be achieved by comparing the portion of the ID that comes after the service ID prefix.
+    * For example, the GTFS Realtime trip ID `30000001_1000000855_053000_02` corresponds to trip IDs in the static schedule such as:
+        * `weekend_30000001_1000000855_053000_02`
+        * `weekday_30000001_1000000855_053000_02`
+        * `23102302_30000001_1000000855_053000_02`
+    * We took the decision not to modify the realtime feed received from operational systems to avoid jeopardising performance; a deeper fix will be deployed in future to ensure out-of-the-box synchronicity between the realtime and static trip IDs.
+
+## BAS.MY Kangar
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-kangar
+# .proto file is returned
+```
+
+## BAS.MY Alor Setar
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-alor-setar
+# .proto file is returned
+```
+
+## BAS.MY Kota Bharu
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-kota-bharu
+# .proto file is returned
+```
+
+## BAS.MY Kuala Terengganu
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-kuala-terengganu
+# .proto file is returned
+```
+
+## BAS.MY Ipoh
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-ipoh
+# .proto file is returned
+```
+
+## BAS.MY Seremban
+Unlike for BAS.MY services in other states, there are 2 endpoints for Seremban, due to the presence of 2 operators which separately provide data to for dissemination via the national Open API. Users should query both endpoints to get a complete picture of currently-running BAS.MY services in Seremban.
+
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-seremban-a
+# .proto file is returned
+```
+
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-seremban-b
+# .proto file is returned
+```
+
+## BAS.MY Melaka
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-melaka
+# .proto file is returned
+```
+
+## BAS.MY Johor Bahru
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-johor
+# .proto file is returned
+```
+
+## BAS.MY Kuching
+```bash
+GET https://api.data.gov.my/gtfs-realtime/vehicle-position/mybas-kuching
+# .proto file is returned
+```
+
+## Understanding the data
+To properly parse the protobuf data, refer to the [official GTFS Realtime language bindings](https://gtfs.org/documentation/realtime/language-bindings/overview/) for guidance on decoding the information. Below is a concise Python example illustrating how to read RapidKL (bus) vehicle position data from the GTFS Realtime API:
+
+```python
+# pip install gtfs-realtime-bindings pandas requests
+from google.transit import gtfs_realtime_pb2
+from google.protobuf.json_format import MessageToDict
+import pandas as pd
+from requests import get
+
+# Sample GTFS-R URL from Malaysia's Open API
+URL = 'https://api.data.gov.my/gtfs-realtime/vehicle-position/prasarana?category=rapid-bus-kl'
+
+# Parse the GTFS Realtime feed
+feed = gtfs_realtime_pb2.FeedMessage()
+response = get(URL)
+feed.ParseFromString(response.content)
+
+# Extract and print vehicle position information
+vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
+print(f'Total vehicles: {len(vehicle_positions)}')
+df = pd.json_normalize(vehicle_positions)
+print(df)
+```

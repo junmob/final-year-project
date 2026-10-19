@@ -1,0 +1,40 @@
+name: Weekly GTFS Static Backup
+
+on:
+  schedule:
+    # Run every Monday at 02:00 UTC (10:00 AM MYT)
+    - cron: '0 2 * * 1'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Download GTFS Static (only if content changed)
+        run: python scripts/download_gtfs_static.py
+
+      - name: Commit and push backup archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/raw/gtfs_static/*.zip data/raw/gtfs_static/manifest.json
+          if git diff --staged --quiet; then
+            echo "No new changes or duplicates already committed."
+          else
+            git commit -m "chore(gtfs): new GTFS static version $(date +'%Y-%m-%d')"
+            git push
+          fi
