@@ -27,7 +27,7 @@ for category in FEEDS:
         continue
 
     # 保存原始文件（之后的采集层也会这样做）
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")  # 统一用 UTC，避免本地与云端时区混淆
     with open(RT_DIR / f"raw_{category}_{stamp}.pb", "wb") as f:
         f.write(resp.content)
 
