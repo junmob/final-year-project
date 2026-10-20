@@ -10,3 +10,8 @@
 ## Project Baseline
 - Current design baseline: `docs/fyp-design/fyp_project_design_v0.4.md` (v0.2/v0.3 are archived in `docs/fyp-design/archive/`).
 - Data source facts and evidence: `docs/data-source/data-source-summary.md`.
+
+## Language Rules (school-facing material)
+- Everything under `reports/` must be written in English only (British English). No Chinese characters anywhere in school-facing material.
+- Code that will be submitted (all source files, comments, log/print messages, configs, workflow files, README) must be English only. Write all new code in English; existing Chinese comments/messages in `ingestion/`, `scripts/`, `.github/` must be translated before any code submission.
+- Internal planning docs (`docs/fyp-design/`, `docs/data-source/`, `docs/context/my-context.md`, `docs/career/`, `docs/prompts/`) may stay in Chinese, but must be excluded from or translated in any submission package. Before submitting, scan for CJK characters (e.g. `grep -rnP '[\x{4e00}-\x{9fff}]'`).
