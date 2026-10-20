@@ -1,6 +1,8 @@
 # FYP 项目设计书 v0.4：巴生谷巴士服务可靠性数据平台
 
-> **英文工作标题**：*Design and Evaluation of a Data Pipeline for Bus Service Reliability Monitoring Using Malaysia's GTFS Realtime Open Data*（是否改为体现湖仓架构的标题，见 §15 待确认）
+> **FYP 英文标题**（✅ 2026-10-20 确定）：**DEVELOPMENT AND EVALUATION OF AN OPEN LAKEHOUSE DATA PIPELINE FOR BUS SERVICE RELIABILITY MONITORING USING MALAYSIA'S GTFS REALTIME OPEN DATA**
+>
+> *（Title Case：Development and Evaluation of an Open Lakehouse Data Pipeline for Bus Service Reliability Monitoring Using Malaysia's GTFS Realtime Open Data）*
 >
 > **版本**：v0.4（2026-10-20）。本文是**当前有效的设计基线**，整体取代 `fyp_project_design_v0.2.md` 与 `fyp_project_design_v0.3.md`（两者移到 `docs/fyp-design/archive/` 作为历史，不再维护）。后续会根据 V06/V07 等实测结果、VM 落地情况和实现进展继续迭代（v0.5 及以后），每次修订在文末记录变更。
 >
@@ -1537,7 +1539,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | # | 事项 | 当前处理 | 什么时候决定 |
 |---|---|---|---|
-| 1 | 英文标题是否改为体现湖仓的版本，例如 *Design and Evaluation of an Open Lakehouse Data Pipeline for Bus Service Reliability Monitoring Using Malaysia's GTFS Realtime Open Data*（FYP 1 标题占 3%） | 暂用原标题 | 写 Proposal 前 |
+| 1 | 英文标题 | ✅ 2026-10-20 确定：DEVELOPMENT AND EVALUATION OF AN OPEN LAKEHOUSE DATA PIPELINE FOR BUS SERVICE RELIABILITY MONITORING USING MALAYSIA'S GTFS REALTIME OPEN DATA | 已完成 |
 | 2 | 本地关机期间的告警通道 | 采集服务在连续失败时调用一个免费的消息推送接口，具体服务待选 | P0 |
 | 3 | 学校日期：IIPSPW 官方截止日；FYP 1、FYP 2 presentation 的日期与形式 | 报告提交窗口已按校历确认；IIPSPW 截止日推算为 Sem 1 Week 8 星期五 17:00（约 2027-03-19） | 2026-12 前 |
 | 3a | 导师：继续由 Ms. Ashikin 指导，还是换为 Sir Wong Chee Siang | 等待回复，同时接触候选导师（my-context §4） | 2026-11 中前 |

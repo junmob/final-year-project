@@ -43,6 +43,8 @@
 
 # 4. 导师、换题流程与提交方式（2026-10-20 更新）
 
+- **新 FYP 标题（2026-10-20 确定）**：DEVELOPMENT AND EVALUATION OF AN OPEN LAKEHOUSE DATA PIPELINE FOR BUS SERVICE RELIABILITY MONITORING USING MALAYSIA'S GTFS REALTIME OPEN DATA
+
 - **沟通渠道**：学校和导师之间用 **Microsoft Teams**。
 - **现任导师**：**Ms. Ashikin**（专长 Deep Learning，旧题目太阳耀斑项目的导师）。
   - 约 2026-10-13 已在 Teams 发消息，说明要把题目和研究领域换成数据工程（基于 data.gov.my 开放数据，去掉深度学习部分），并询问：① 她是否愿意继续指导，还是需要换一位数据工程方向的导师；② 是否需要提交 amendment form 并重写 IIPSPW report。
