@@ -5,7 +5,9 @@
    - **GTFS Static 自动下载已上线**：`scripts/download_gtfs_static.py` + GitHub Actions（`.github/workflows/backup_gtfs.yml`，每周一），按 ZIP 内容指纹判断有无变化，有变化才存档到 `data/raw/gtfs_static/`。
    - **GTFS Realtime 采集脚本已写好并本地测试通过**：`ingestion/collect_gtfs_rt.py`（每 30 秒、两个 feed 错开 15 秒、只存原始 `.pb`、写健康日志）+ systemd 服务文件。**尚未部署**：云端 VM 选定 Oracle Cloud Always Free（新加坡），因该区域暂无容量（A1.Flex 和 E2.1.Micro 均 Out of capacity），正在每天重试；备选 GCP e2-micro。
    - **V06/V07 实测**：由一次性 workflow（`realtime_probe.yml`）在 2026-10-21（周三）马来西亚时间 08:00/13:00/18:00/23:00 自动运行，证据存 `docs/evidence/realtime_probe/`。
-   - **仍待完成**：设计书定稿（本文件第 1 点之后的任务）、Proposal 报告重写、采集服务上线。设计书不应再写"先不写采集代码"，而应以现有 `ingestion/` 的实现为准。
+   - **仍待完成**：设计书定稿（本文件第 1 点之后的任务）、Proposal 报告重写、采集服务上线。设计书不应再写"先不写采集代码"。现有 `ingestion/` 原型作为可行性证据，并按设计书 v0.4 §8.3 演进为完整的采集服务（2026-10-20 确认）。
+   - **设计书现状**：`docs/fyp-design/fyp_project_design_v0.4.md` 是当前有效基线，取代 v0.2、v0.3，后续会继续迭代。
+   - **天气临时归档**：P0 上线前由 `.github/workflows/weather_archive.yml` 每天 07:00、19:00 MYT 归档到 `data/raw/weather_*`。
 
 ---
 

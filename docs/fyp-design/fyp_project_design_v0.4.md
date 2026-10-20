@@ -1245,7 +1245,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 事项 | 时间 | 说明 |
 |---|---|---|
 | 持续重试 Oracle 容量，同时申请 GCP e2-micro | 立即 | 拿到即上线（M0） |
-| **天气预报临时归档** | 立即 | 在 P0 上线前，用临时定时任务每天采集两次（需要新增 workflow，本次不改 `.github/`） |
+| **天气预报临时归档** | ✅ 2026-10-20 | `weather_archive.yml` 每天两次归档预报与警告；P0 采集服务接管后删除 |
 | V06/V07 实测（2026-10-21）完成后更新数字 | 2026-10-22 | 更新 §0 成本、§5 匹配率、§14 RQ4 数据量 |
 | V01 天气预报实测 | 写 Proposal 前 | 分页、`location_id`、更新时间 |
 | V04 mrtfeeder `calendar_dates` | 写 Proposal 前 | E33 |
@@ -1518,16 +1518,16 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 3 | `scripts/download_gtfs_static.py` | 输出为平铺的 `data/raw/gtfs_static/<category>_<YYYYMMDD>.zip` + `manifest.json`，本设计为 `bronze/gtfs_static/feed=/date=/gtfs.zip` + `.sha256`；日期取运行环境的本地日期（GitHub runner 为 UTC），没有重试 | 并入采集服务的 Static 模块时统一路径、显式使用马来西亚时间；`bronze_sync` 负责把已有存档映射到新路径 |
 | 4 | `.github/workflows/backup_gtfs.yml` | 每周一次，本设计为云端每天 04:00 检查；ZIP 直接提交进 Git 仓库，仓库会随版本数增长 | 保留为异地备份；注意仓库体积，必要时改为只保留指纹清单 |
 | 5 | `.github/workflows/realtime_probe.yml` | 一次性实测，但 cron 每年同一天都会触发 | 2026-10-21 实测完成后删除（文件内已注明） |
-| 6 | summary §7.3 部署分工 | ① 客流文件下载放在云端 VM，本设计改为本地 Airflow（客流文件整份覆盖、含全年历史，代价是本地关机期间可能错过中间的修订版本）；② "演示时在本地临时启动一个采集实例直接写 Kafka"会让 RT 请求翻倍，本设计改为中继和回放；③ "同步后清理 VM 旧文件"改为"磁盘允许时保留完整副本，校验通过后才清理"；④ A 档在云端运行 MinIO 和 Kafka，与"云端不运行 Kafka"不同 | 之后更新 summary §7.3 |
-| 7 | summary §2.3、§10 的 V02 | summary 中 V02 仍为 ❓ | 按 2026-10-20 的裁决更新为"已确认：各 API 类别独立计数"，同时注明计数主体（IP 或 endpoint）没有写明 |
+| 6 | summary §7.3 部署分工 | ① 客流文件下载放在云端 VM，本设计改为本地 Airflow（客流文件整份覆盖、含全年历史，代价是本地关机期间可能错过中间的修订版本）；② "演示时在本地临时启动一个采集实例直接写 Kafka"会让 RT 请求翻倍，本设计改为中继和回放；③ "同步后清理 VM 旧文件"改为"磁盘允许时保留完整副本，校验通过后才清理"；④ A 档在云端运行 MinIO 和 Kafka，与"云端不运行 Kafka"不同 | ✅ 2026-10-20 已在 summary §7.3 加注：以本设计 §8.3 为准 |
+| 7 | summary §2.3、§10 的 V02 | summary 中 V02 仍为 ❓ | ✅ 2026-10-20 已更新 |
 | 8 | summary §7.1 | Static 每天 04:00 与当前的每周 GitHub Actions 不一致 | 云端采集服务上线后即一致 |
 | 9 | summary §5、§10 编号 | E 编号中没有 E21，V 编号中没有 V03 | 不重新编号，只在 summary 中注明 |
-| 10 | summary §4.4、§5 | 2026-10-20 02:11 探测发现 rapid-bus-kl 深夜为空 feed（0 辆车），summary 中没有收录为观察项 | 建议作为观察项加入 summary；本设计已据此修改 L1 可用率定义和 DQ21 |
+| 10 | summary §4.4、§5 | 2026-10-20 02:11 探测发现 rapid-bus-kl 深夜为空 feed（0 辆车），summary 中没有收录为观察项 | ✅ 2026-10-20 已加入 summary §4.4 观察 |
 | 11 | summary §11 | 写着"收到 UTAR 模板后重新对应" | 已由本设计 §11 完成，可以在 summary 中引用 §11 |
-| 12 | `docs/context/my-context.md` §1.3 | "设计书应以现有 `ingestion/` 的实现为准" | 2026-10-20 已确认：原型作为可行性证据，演进为本设计；建议修改这句措辞 |
-| 13 | `docs/context/fyp-index.md` §1 | 全局规则写"表格标题放上方"，与 FYP 1、FYP 2 的 guideline（标题放下方）不同 | 2026-10-20 已确认：以各阶段 guideline 为准，`fyp-index.md` 只作索引；建议在该文件中注明 |
+| 12 | `docs/context/my-context.md` §1.3 | "设计书应以现有 `ingestion/` 的实现为准" | ✅ 2026-10-20 已修改 |
+| 13 | `docs/context/fyp-index.md` §1 | 全局规则写"表格标题放上方"，与 FYP 1、FYP 2 的 guideline（标题放下方）不同 | 2026-10-20 已确认：以各阶段 guideline 为准，`fyp-index.md` 只作索引，不再修改 |
 | 14 | `docs/fyp-design/Opus_Design_Prompt.md` | 产出文件名写作 `fyp_project_design_v0.4_final.md` | 已改名为 `fyp_project_design_v0.4.md`（本设计会继续迭代） |
-| 15 | `docs/context/academic-calendar.md` | 尚未提交到 Git | 提交 |
+| 15 | `docs/context/academic-calendar.md` | 尚未提交到 Git | ✅ 已提交 |
 | 16 | v0.3 §7 | 把 Kafka 对应到 Grab，但 `Job_Market.md` 中 Grab 的原文没有点名 Kafka | 本设计 §9.3 只按原文能对应的公司列出 |
 
 ### 15.3 待确认事项
@@ -1543,7 +1543,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 7 | Polaris 的部署复杂度是否可以接受 | 备选：iceberg-rest 参考实现 | P1 技术验证 |
 | 8 | "Snowflake Open Catalog 基于 Apache Polaris"这一说法 | 只用于面试准备，引用前核实官方说明 | 需要时 |
 | 9 | Oracle 与 GCP 免费额度的具体条款（空闲回收、出站流量、磁盘） | 按 §8.3.4 的风险提示处理 | 拿到 VM 前后 |
-| 10 | 天气预报的临时归档（P0 上线前） | 建议新增一个每天两次的临时 workflow，需要你同意后再改 `.github/` | 立即 |
+| 10 | 天气预报的临时归档（P0 上线前） | ✅ 2026-10-20 已上线 `weather_archive.yml` + `scripts/download_weather.py`（每天 07:00、19:00 MYT，内容变化才保存） | 已完成 |
 | 11 | 设计中的经验阈值：DQ21 的"深夜 < 10 辆不参与比较"、线性参照的"后退 < 30 米按前值处理"、准点窗口 −60 至 +300 秒等 | 作为初始值，P2–P3 用真实数据校准 | P2–P3 |
 | 12 | V02 的计数主体（按 IP 还是按 endpoint） | 不影响设计（始终只运行一个采集实例），只做 429 监控 | 出现异常 429 时 |
 | 13 | 试点路线的具体选择 | 按 §10.1 标准，在积累 14 天数据后选定 | P2 前 |

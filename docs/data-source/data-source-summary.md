@@ -96,7 +96,7 @@
 超出限额时返回 `429 Too Many Requests`，后续请求会失败。
 
 **分析**：
-- 文档按 **API 类别**分别列出限额，💡 推测是每个类别各自计数（Realtime 和 Static 不互相占用）。但文档没有说明是按 IP、按 endpoint 还是按类别计数 ❓（V02）。
+- ✅ **V02 已确认（2026-10-20）**：官方限流文档（`raw-data-source/04_Rate_Limit.md`）按 **API 类别**分行列出限额，判定为**各类别独立计数**，Realtime、Static、Weather 不互相占用。文档仍没有写明计数主体是 IP 还是 endpoint，所以任何时候只运行一个采集实例，并持续监控 429。
 - **关键约束**：`rapid-bus-kl` 和 `rapid-bus-mrtfeeder` 都属于 "GTFS Realtime" 类别。两个 feed 各每 30 秒一次 = **每分钟 4 次，正好等于上限**。这意味着：
   - 任何一次重试都可能触发 429
   - 不能再增加第三个 Realtime feed（除非限额是按 endpoint 计算）
@@ -429,6 +429,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 **观察**：
 - 星期一的车辆数多于星期日，`trip_id` 前缀也正确反映了平日和周末。
 - 两次实测都只在晚上进行，**没有白天高峰的数据**，车辆数和规模估算可能偏低（V07）。
+- **2026-10-20 02:11 MYT 云端探测**（`docs/evidence/realtime_probe/console_20261020_0211_MYT.txt`）：rapid-bus-kl 返回 HTTP 200 但 **0 辆车**（文件 15 字节）；mrtfeeder 只有 1 辆车（即 E03 的 `VAL4552`）。说明深夜可能是空 feed：可用率统计中空快照应计为成功，车辆数异常检测（DQ21）必须按时段比较。
 
 ### 4.5 字段剖析
 
@@ -636,7 +637,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 | 6 | **地点没有坐标** | 建 `seed_met_location_map.csv`，把巴生谷的地点对应到县和州 |
 | 7 | 地点名称与 DOSM 县名可能不一致 | 人工映射表（实体对齐的一部分） |
 | 8 | `contains` 等过滤是区分大小写的 | 使用 `icontains` 或先确认实际名称 |
-| 9 | 默认返回条数、是否分页未知 | V01 实测；必要时按地点类型分次请求 |
+| 9 | 默认返回条数、是否分页未知 | 🟡 2026-10-20 实测：不带参数一次返回全国全部数据（3080 行 = 440 个地点 × 7 天，约 0.9 MB），不需要分页。注意不带结尾斜杠的 URL 会先返回 301 |
 | 10 | 更新时间（每天几点）未知 | 每天采集两次，用内容哈希去重 |
 
 #### 6.1.4 采集设计
@@ -644,7 +645,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 | 项目 | 设计 |
 |---|---|
 | 频率 | 每天两次（例如 07:00 和 19:00），用内容哈希去重，同时捕捉当天的修订 |
-| 请求 | 💡 视 V01 结果：一次取全部，或者按 `St` 和 `Ds` 前缀分 2 到 3 次请求，每次间隔 ≥ 20 秒 |
+| 请求 | 一次取全部（V01 已部分确认），每次采集 1 个请求；全国数据 gzip 后约 24 KB |
 | 范围 | 巴生谷相关的州（W.P. Kuala Lumpur、Selangor、W.P. Putrajaya）及其县、镇（具体 `location_id` 待 V01 确认） |
 | Bronze | `bronze/weather_forecast/date=YYYY-MM-DD/fetched_at=HHMMSS.json`，原样保存 |
 | 部署 | 放在 24 小时运行的云端采集服务里，和 GTFS 一起 |
@@ -888,9 +889,12 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 | `storage.data.gov.my` / `storage.dosm.gov.my` 文件下载 | 💡 静态文件托管，可能不受 API 限流 | 每天约 1 次 | 充足 |
 
 > [!WARNING]
-> 如果 V02 发现限额是**按 IP 全局计算**（所有 API 共用 4 次/分钟），那么 Static 和天气的请求必须"借用" Realtime 的时间槽，也就是在那一分钟跳过一次 GTFS-RT 采集，并在 `fct_feed_health` 中标记为"计划内跳过"。
+> ✅ V02 已确认各 API 类别独立计数，Static 和天气不占用 Realtime 的额度，不需要借用 Realtime 的时间槽。
 
 ### 7.3 部署分工（已决定使用免费云 VM）
+
+> [!NOTE]
+> **本节已被设计书取代**：最新的采集层设计（按 VM 规格分为 A/B/C 三档、客流与人口改为本地下载、演示改用中继与回放而不是再开一个采集实例、云端校验通过后才清理）以 [`fyp_project_design_v0.4.md`](../fyp-design/fyp_project_design_v0.4.md) §8.3 为准。下表保留作为早期决定的记录。
 
 | 位置 | 运行内容 | 原因 |
 |---|---|---|
@@ -942,8 +946,8 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 | ID | 事项 | 方法 | 优先级 |
 |---|---|---|---|
 | **V00** | **每周手动下载三个核心 Static ZIP**（kl、mrtfeeder、rail），按日期命名保存 | 浏览器直接打开端点 | 🔴 **立即开始，持续到 P0 上线** |
-| V01 | 天气预报实测：响应结构；默认返回条数、是否分页；巴生谷所有相关地点的 `location_id` 和名称；能否查询过去日期；每天几点更新 | 浏览器打开 `/weather/forecast?limit=5&meta=true`，以及 `?icontains=Kuala Lumpur@location__location_name`、`?contains=St@location__location_id`、`?date_start=2026-09-01@date` | 写 Proposal 前 |
-| V02 | 限流规则：按 IP 全局、按类别，还是按 endpoint | 连续快速请求 Realtime 6 次后，立即请求一次 Static 或天气，看是否 429 | 写代码前 |
+| V01 | 🟡 **部分完成（2026-10-20）**：不分页，一次返回 3080 行，覆盖当天起 7 天；地点类型 Tn 1407、Ds 1176、Rc 259、Dv 126、St 112 行。仍待确认：巴生谷相关的 `location_id` 列表、能否查询过去日期、每天几点更新。原始事项：天气预报实测：响应结构；默认返回条数、是否分页；巴生谷所有相关地点的 `location_id` 和名称；能否查询过去日期；每天几点更新 | 浏览器打开 `/weather/forecast?limit=5&meta=true`，以及 `?icontains=Kuala Lumpur@location__location_name`、`?contains=St@location__location_id`、`?date_start=2026-09-01@date` | 写 Proposal 前 |
+| V02 | 限流规则：按 IP 全局、按类别，还是按 endpoint | ✅ 2026-10-20 按官方文档确认为按类别独立计数（计数主体未写明，只做 429 监控） | 已完成 |
 | V04 | mrtfeeder `calendar_dates` 全部 5 行内容 | 打开文件 | 写 Proposal 前 |
 | V05 | rapid-bus-kl `trip_id` 序号：Static 中 `U2500` 路线有哪些 `trip_id`？有没有 `_22`、`_23`？ | 在 `trips.txt` 中搜索 `U2500` | 写代码前 |
 | V06 | mrtfeeder 对不上的 `trip_id`：同一天下载 Static 后重新比对，匹配率是否提高；是否出现在 `problematic_trips.csv` | 当天下载 Static 后运行 `check_realtime.py` | 写代码前 |

@@ -1,0 +1,12 @@
+{
+  "weather_forecast": {
+    "sha256": "cfeb8c402a2688bb6c36b6d68ec5d10bad87f6453eee6c91c1ef0147d424dd23",
+    "file": "weather_forecast/date=2026-10-20/fetched_at=162121.json.gz",
+    "records": 3080
+  },
+  "weather_warning": {
+    "sha256": "89f57d6c4ca24be369e2026def9aa2b9dec6653679d4dbb49880fcc295b4c674",
+    "file": "weather_warning/date=2026-10-20/fetched_at=162121.json.gz",
+    "records": 4
+  }
+}
