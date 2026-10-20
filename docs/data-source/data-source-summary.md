@@ -547,6 +547,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 | E39 | 客流文件按年份命名，并且每天整份覆盖 | 官方 URL `rapidrail_2026_daily.parquet` | 🔧 文件名按年份动态生成；增量识别 | DQ26 |
 | E40 | 人口表混合多个切片，单位是千人且为浮点数 | 官方样本与变量定义 | 🔧 只取 overall 切片，乘以 1000 | DQ29 |
 | E41 | 公共假期没有官方 API | 你的查证 | 🔧 dbt seed 人工维护 | DQ28 |
+| E42 | 天气预报的实际取值与文档枚举不一致 | 2026-10-20 实测：`Jerebu`（文档为 `Berjerebu`）、`Tiada Hujan`（文档为 `Tiada hujan`，大小写不同） | 🔧 规范化大小写和空格；映射表收录同义写法；新值📊 | DQ22 |
 
 ---
 
@@ -597,6 +598,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 |---|---|---|---|---|---|
 | `Tiada hujan` | No rain | no_rain | 0 | — | — |
 | `Berjerebu` | Hazy | haze | 0（另设 `is_haze` 标记） | — | — |
+| `Jerebu`（文档未列出，2026-10-20 实测，E42） | Hazy | haze | 0（另设 `is_haze` 标记） | — | — |
 | `Hujan di satu dua tempat` | Isolated rain | rain | 1 | isolated | — |
 | `Hujan di satu dua tempat di kawasan pantai` | Isolated rain over coastal areas | rain | 1 | isolated | coastal |
 | `Hujan di satu dua tempat di kawasan pedalaman` | Isolated rain over inland areas | rain | 1 | isolated | inland |
@@ -629,22 +631,22 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 
 | # | 坑点 | 处理 |
 |---|---|---|
-| 1 | **只有马来文**。文字本身是 ASCII，没有编码问题，风险在于上游可能出现**文档没列出的新值**、大小写或空格变化 | 规范化（去空格、统一大小写）后再映射；未知值告警（DQ22） |
+| 1 | **只有马来文**。文字本身是 ASCII，没有编码问题，风险在于上游可能出现**文档没列出的新值**、大小写或空格变化。✅ **2026-10-20 已实测出现**（E42）：`Jerebu`（文档为 `Berjerebu`）、`Tiada Hujan`（文档为 `Tiada hujan`） | 规范化（去空格、统一大小写）后再映射；映射表同时收录实际出现的同义写法；未知值告警（DQ22） |
 | 2 | **这是预报，不是实际观测** | 研究问题措辞要准确："预报有雷暴的时段"；实际观测天气作为 FYP 2 可选（§6.1.6） |
 | 3 | **没有历史接口**（✅ 2026-10-20 实测：`?date_start=2026-09-01@date&date_end=2026-09-03@date` 返回 HTTP 200 和空列表 `[]`，只提供当天起 7 天） | 从 P0 开始每天归档（临时由 `weather_archive.yml` 执行，已于 2026-10-20 开始） |
 | 4 | **记录中没有发布时间** | 用采集时间作为发布时间；保存每次快照 |
-| 5 | **同一个目标日期会被预报 7 次**（提前 0 到 6 天），而且每天可能修订 | 建模时保留"预报提前天数"（lead time） |
+| 5 | **同一个目标日期会被预报 7 次**（提前 0 到 6 天），而且**一天之内也会修订**（✅ 2026-10-20 实测：16:21 与 16:46 MYT 两次采集相隔 25 分钟，3080 行中有 79 行不同，全部是当天的预报，例如 `Ds055` Gombak 当天下午改为 `Ribut petir di beberapa tempat`） | 建模时保留"预报提前天数"（lead time）和采集时间；每 3 小时采集一次以捕捉修订 |
 | 6 | **地点没有坐标** | 建 `seed_met_location_map.csv`，把巴生谷的地点对应到县和州 |
 | 7 | 地点名称与 DOSM 县名可能不一致 | 人工映射表（实体对齐的一部分） |
 | 8 | `contains` 等过滤是区分大小写的 | 使用 `icontains` 或先确认实际名称 |
 | 9 | 默认返回条数、是否分页未知 | 🟡 2026-10-20 实测：不带参数一次返回全国全部数据（3080 行 = 440 个地点 × 7 天，约 0.9 MB），不需要分页。注意不带结尾斜杠的 URL 会先返回 301 |
-| 10 | 更新时间（每天几点）未知（❓ V01 剩余项） | 每天采集两次（07:00、19:00 MYT），用内容哈希去重；根据哪一次采集出现新内容、日期范围何时后移来推断更新时间；几天后仍无法判断时临时加密采集频率 |
+| 10 | 更新时间（每天几点）未知（❓ V01 剩余项）；已知一天内会多次修订（坑点 5） | 每 3 小时采集一次（00:00、03:00……21:00 MYT），用内容哈希去重；根据哪些时段出现新内容、日期范围何时后移来推断更新与修订时间 |
 
 #### 6.1.4 采集设计
 
 | 项目 | 设计 |
 |---|---|
-| 频率 | 每天两次（例如 07:00 和 19:00），用内容哈希去重，同时捕捉当天的修订 |
+| 频率 | 每 3 小时一次（每天 8 次，2026-10-20 由每天两次调整，因为实测一天内会修订），用内容哈希去重 |
 | 请求 | 一次取全部（V01 已部分确认），每次采集 1 个请求；全国数据 gzip 后约 24 KB |
 | 范围 | 采集时保存全国全部数据（一次请求，gzip 后约 24 KB）；建模时筛选巴生谷相关地点，`location_id` 见 §6.1.7 |
 | Bronze | `bronze/weather_forecast/date=YYYY-MM-DD/fetched_at=HHMMSS.json`，原样保存 |
@@ -888,7 +890,7 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 | GTFS-RT kl | OpenAPI | 每 30 秒 | 2880 | `bronze/gtfs_rt/feed=rapid-bus-kl/date=/hour=/<UTC时间>.pb` | `(feed, vehicle_id, timestamp)` | — |
 | GTFS-RT feeder | OpenAPI | 每 30 秒（与 kl 错开 15 秒） | 2880 | `bronze/gtfs_rt/feed=rapid-bus-mrtfeeder/...` | 同上 | — |
 | GTFS Static × 3 | OpenAPI | 每天 04:00，每个间隔 ≥ 20 秒 | 3 | `bronze/gtfs_static/feed=/date=/gtfs.zip` + `.sha256` | 文件哈希 | 哈希变化 → 新版本（SCD2） |
-| 天气预报 | OpenAPI | 每天 07:00、19:00 | 2–6 | `bronze/weather_forecast/date=/fetched_at=.json` | `(location_id, date, 采集时间)` | 内容哈希 |
+| 天气预报 | OpenAPI | 每 3 小时 | 8 | `bronze/weather_forecast/date=/fetched_at=.json` | `(location_id, date, 采集时间)` | 内容哈希 |
 | 天气警告 | OpenAPI | 每小时 | 24 | `bronze/weather_warning/date=/hour=.json` | `(issued, title_en, valid_from)` | 内容哈希 |
 | Rapid Rail OD 客流 | 文件下载 | 每天 23:00（官方 22:00 更新之后） | 1 | `bronze/ridership_rapidrail/year=2026/downloaded=YYYY-MM-DD/rapidrail_2026_daily.parquet` + `.sha256` | `(date, origin, destination)` | 文件哈希 + 最大日期 |
 | 行政区人口 | 文件下载 | 每月检查一次 | ≈ 0 | `bronze/population_district/downloaded=/population_district.parquet` | `(state, district, date, sex, age, ethnicity)` | 文件哈希 |
@@ -988,7 +990,7 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 | 3.x Data Source Identification | §1 总览；§3.1、§4.1 端点清单；§6 各辅助数据源的官方结构 |
 | 3.x API Characteristics and Constraints | §2 OpenAPI 机制（限流、响应格式、查询参数）；§7.2 限流预算 |
 | 3.x Data Profiling | §3.4 各运营商样本剖析；§3.5 跨运营商对照；§3.6 排班模式；§4.4–§4.7 实测、字段剖析、ID 匹配、规模估算 |
-| 3.x Data Quality Assessment | §5 异常证据目录（E01–E41）；§8 辅助数据质量规则 |
+| 3.x Data Quality Assessment | §5 异常证据目录（E01–E42）；§8 辅助数据质量规则 |
 | 3.x Data Source Selection and Justification | §6 各数据源的评估与决定；§9 决策汇总 |
 | 3.x Assumptions and Limitations | 天气时段与小时映射的假设；预报与实际观测的差别；客流只有轨道；速度单位推断；行数统计误差 |
 | 附录 | 实测截图（10/5、10/11）；样本文件；`problematic_trips.csv`；映射表（天气、路线、站点）；假期 seed |
