@@ -2,14 +2,14 @@
 
 > **英文工作标题**：*Design and Evaluation of a Data Pipeline for Bus Service Reliability Monitoring Using Malaysia's GTFS Realtime Open Data*（是否改为体现湖仓架构的标题，见 §15 待确认）
 >
-> **版本**：v0.4（2026-10-20）。本文是**当前有效的设计基线**，整体取代 `fyp_project_design_v0.2.md` 与 `fyp_project_design_v0.3.md`（两者保留在仓库中作为历史，不再维护）。后续会根据 V06/V07 等实测结果、VM 落地情况和实现进展继续迭代（v0.5 及以后），每次修订在文末记录变更。
+> **版本**：v0.4（2026-10-20）。本文是**当前有效的设计基线**，整体取代 `fyp_project_design_v0.2.md` 与 `fyp_project_design_v0.3.md`（两者移到 `docs/fyp-design/archive/` 作为历史，不再维护）。后续会根据 V06/V07 等实测结果、VM 落地情况和实现进展继续迭代（v0.5 及以后），每次修订在文末记录变更。
 >
 > **依据（冲突时按此顺序裁决）**：
 > 1. [`docs/context/my-context.md`](../context/my-context.md)：个人决策、学校政策、2027 真实时间线
 > 2. [`docs/data-source/data-source-summary.md`](../data-source/data-source-summary.md)（下文简称 **summary**）：数据源事实、实测证据、脏点 E01–E41、限流、辅助数据源决策
-> 3. [`fyp_project_design_v0.3.md`](fyp_project_design_v0.3.md)：架构与技术栈（全本地 Docker 湖仓）
-> 4. [`Job_Market.md`](Job_Market.md)：工具选型约束（15 家公司 JD）
-> 5. [`fyp_project_design_v0.2.md`](fyp_project_design_v0.2.md)：业务、指标、数据质量规则、论文结构的原文基础
+> 3. [`fyp_project_design_v0.3.md`](archive/fyp_project_design_v0.3.md)：架构与技术栈（全本地 Docker 湖仓）
+> 4. [`Job_Market.md`](../career/Job_Market.md)：工具选型约束（15 家公司 JD）
+> 5. [`fyp_project_design_v0.2.md`](archive/fyp_project_design_v0.2.md)：业务、指标、数据质量规则、论文结构的原文基础
 > 6. `docs/context/{proposal,fyp1,fyp2}/` 的 guidelines 与 template，[`docs/context/fyp-index.md`](../context/fyp-index.md)，[`docs/context/academic-calendar.md`](../context/academic-calendar.md)（UTAR 2027–2028 校历）
 > 7. 已有原型：[`ingestion/collect_gtfs_rt.py`](../../ingestion/collect_gtfs_rt.py)、[`scripts/download_gtfs_static.py`](../../scripts/download_gtfs_static.py)、[`.github/workflows/`](../../.github/workflows/)（只作可行性证据，不是约束）
 >
@@ -1526,7 +1526,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 11 | summary §11 | 写着"收到 UTAR 模板后重新对应" | 已由本设计 §11 完成，可以在 summary 中引用 §11 |
 | 12 | `docs/context/my-context.md` §1.3 | "设计书应以现有 `ingestion/` 的实现为准" | ✅ 2026-10-20 已修改 |
 | 13 | `docs/context/fyp-index.md` §1 | 全局规则写"表格标题放上方"，与 FYP 1、FYP 2 的 guideline（标题放下方）不同 | 2026-10-20 已确认：以各阶段 guideline 为准，`fyp-index.md` 只作索引，不再修改 |
-| 14 | `docs/fyp-design/Opus_Design_Prompt.md` | 产出文件名写作 `fyp_project_design_v0.4_final.md` | 已改名为 `fyp_project_design_v0.4.md`（本设计会继续迭代） |
+| 14 | `docs/prompts/Opus_Design_Prompt.md` | 产出文件名写作 `fyp_project_design_v0.4_final.md` | 已改名为 `fyp_project_design_v0.4.md`（本设计会继续迭代） |
 | 15 | `docs/context/academic-calendar.md` | 尚未提交到 Git | ✅ 已提交 |
 | 16 | v0.3 §7 | 把 Kafka 对应到 Grab，但 `Job_Market.md` 中 Grab 的原文没有点名 Kafka | 本设计 §9.3 只按原文能对应的公司列出 |
 

@@ -1,5 +1,5 @@
 # 1. 我的最新个人与环境决策（用来更新待定项）
-1. **本地硬件配置**：我的电脑是 **16GB RAM**。这符合 `docs/fyp-design/fyp_project_design_v0.3.md` 中 Docker Compose 分 profile 启动的规划（开发时开 `batch` + `serve` 约 7-9GB，可以跑得动）。
+1. **本地硬件配置**：我的电脑是 **16GB RAM**。这符合 `docs/fyp-design/archive/fyp_project_design_v0.3.md`（现已由 v0.4 取代） 中 Docker Compose 分 profile 启动的规划（开发时开 `batch` + `serve` 约 7-9GB，可以跑得动）。
 2. **数据采集运行环境**：我的个人电脑**不能 24 小时开机**。因此，24小时不间断的采集服务（`ingest` profile）我决定后续部署在**免费的云端常驻虚拟机（如 GCP Always Free `e2-micro` 或 Oracle Cloud Free Tier）**上。
 3. **当前阶段重心（2026-10-20 更新）**：采集代码**已经开始写，不再是"先不写"**。当前状态：
    - **GTFS Static 自动下载已上线**：`scripts/download_gtfs_static.py` + GitHub Actions（`.github/workflows/backup_gtfs.yml`，每周一），按 ZIP 内容指纹判断有无变化，有变化才存档到 `data/raw/gtfs_static/`。

@@ -9,3 +9,6 @@ venv/
 # misc
 .env
 .DS_Store
+*.tmp
+.pytest_cache/
+.ruff_cache/

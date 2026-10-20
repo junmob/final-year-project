@@ -7,7 +7,7 @@
 #   - 只保存完整原始 .pb，不在采集端解析
 #
 # Bronze 路径：<DATA_DIR>/feed=<feed>/date=<YYYY-MM-DD>/hour=<HH>/<YYYYMMDD>T<HHMMSS>Z.pb
-#   date / hour 为马来西亚时间（UTC+8），文件名为 UTC 时间槽，与 fyp_project_design_v0.2.md 一致
+#   date / hour 为马来西亚时间（UTC+8），文件名为 UTC 时间槽，与设计书 v0.4 §8.3.3 一致
 # 健康日志：<DATA_DIR>/_health/feed_health_<YYYY-MM-DD>.jsonl（每次请求一行）
 import hashlib
 import json

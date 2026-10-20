@@ -6,7 +6,7 @@
 #   - 记录中没有发布时间，用采集时间代替（E35），所以文件名记录采集时间
 # 输出：data/raw/weather_forecast/date=<YYYY-MM-DD>/fetched_at=<HHMMSS>.json.gz（马来西亚时间）
 #       data/raw/weather_warning/date=<YYYY-MM-DD>/fetched_at=<HHMMSS>.json.gz
-#       内容哈希记录在 data/raw/weather_manifest.json
+#       最近一次保存的内容哈希记录在各自目录的 manifest.json
 import gzip
 import hashlib
 import json
@@ -19,7 +19,6 @@ import requests
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "data" / "raw"
-MANIFEST = OUT_DIR / "weather_manifest.json"
 # 不带结尾斜杠会先返回 301
 ENDPOINTS = {
     "weather_forecast": "https://api.data.gov.my/weather/forecast/",
@@ -30,7 +29,6 @@ MYT = timezone(timedelta(hours=8))
 
 
 def main() -> int:
-    manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     now = datetime.now(MYT)
     failed = False
 
@@ -49,8 +47,10 @@ def main() -> int:
         # 按规范化后的 JSON 计算哈希，避免空格或键顺序差异被当成新内容
         canonical = json.dumps(data, ensure_ascii=False, sort_keys=True).encode()
         digest = hashlib.sha256(canonical).hexdigest()
-        if digest == manifest.get(name, {}).get("sha256"):
-            print(f"[无变化] {name}: 与 {manifest[name]['file']} 内容相同，跳过")
+        manifest_path = OUT_DIR / name / "manifest.json"
+        previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+        if digest == previous.get("sha256"):
+            print(f"[无变化] {name}: 与 {previous['file']} 内容相同，跳过")
             continue
 
         out_dir = OUT_DIR / name / f"date={now:%Y-%m-%d}"
@@ -58,14 +58,14 @@ def main() -> int:
         path = out_dir / f"fetched_at={now:%H%M%S}.json.gz"
         # 原样保存响应内容；mtime=0 让相同内容的 gzip 字节也相同
         path.write_bytes(gzip.compress(resp.content, mtime=0))
-        manifest[name] = {
+        manifest = {
             "sha256": digest,
-            "file": str(path.relative_to(OUT_DIR)),
+            "file": str(path.relative_to(OUT_DIR / name)),
             "records": len(data) if isinstance(data, list) else None,
         }
+        manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
         print(f"[新内容] {name}: 已保存 {path.relative_to(ROOT)}（{len(resp.content)/1024:.0f} KB 原始）")
 
-    MANIFEST.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
     return 1 if failed else 0
 
 
