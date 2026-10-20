@@ -899,7 +899,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 |---|---|---|---|---|
 | **P0 采集上线** | **2026-10-21 → VM 到手即上线（目标 11-10 前）** | | C 档先行：本地开机时运行采集服务；VM 到手后切换到 A 或 B 档；天气预报开始归档；每日打包与 manifest | |
 | **P1 湖仓基础** | 2026-11 → 2026-12 | 写 IIPSPW Proposal（11 月中开始） | 本地 `lake`、`batch` profile；`bronze_sync`；Spark 解析 Bronze → Iceberg Raw/Silver；DQ01–DQ12；Static SCD2 与 DQ13–DQ19；Polaris；Kafka 接入（发布器或中继） | 补 Spark 与 Iceberg 基础 |
-| **IIPSPW 提交** | **2027-01 上旬（复学前，确切截止日 ❓）** | ⭐ 提交重写版 Proposal（纯文字） | | |
+| **IIPSPW 提交** | **目标 2027-01 上旬（复学前）；推算的截止日约为 Sem 1 Week 8 星期五 17:00，即 2027-03-19 前后（非官方）** | ⭐ 提交重写版 Proposal（纯文字，Word + PDF 发邮件给导师）+ FYP 1 amendment form（导师签名；换导师则两位都签） | | |
 | **P2 MVP** | 2026-12 → 2027-02 | FYP 1 开学（01-25）；写 FYP 1 Ch1–Ch3（大部分从 Proposal 扩写） | ClickHouse + dbt-clickhouse 构建 Gold；半径法到站推断；试点路线 OTP；至少 10 条 DQ 规则以测试形式运行；Airflow 串起全流程；Metabase 看板 ①②⑥；假期 seed | 整理 README 初版 |
 | **P3 全面推广** | 2027-03 → 2027-04 | 3 月写 FYP 1 Ch4（成果截至 3 月底）与 Ch5；⭐ **FYP 1 报告在 Week 12（04-12 至 04-18）提交**；随后 presentation（PPT + 代码 + MVP 现场演示，确切日期 ❓） | mrtfeeder 全部路线；rapid-bus-kl 发车间隔、EWT、串车；线性参照插值；天气（州级）；客流回填（2023 年起）与每日 MERGE；`dim_location` 实体对齐；RBAC 与脱敏；CI；SLO 与切换演练；dbt docs；看板 ③④⑤⑦ | 练 SQL 题与 CS 基础 |
 | **P4 亮点收尾** | 2027-04-19 → 05-31（**05-31 硬截止**） | 05-03 至 05-23 考试周（开发时间会被压缩，主要工作放在 4 月下旬和 05-24 起的学期假期） | 流处理方案 A（方案 B 视时间）；Prometheus/Grafana；RQ4 初步基准（1 周、1 个月两档）；README、架构图、2 分钟 demo 视频 | ⭐ 简历定稿，写入真实数字 |
@@ -925,7 +925,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 |---|---|---|
 | **M0 采集上线** | VM 到手后一周内（目标 2026-11-10） | 云端采集连续 7 天，每个 feed 每天可用率 ≥ 95%；每日打包与 manifest 正常；Static 每天检查；天气每天两次；runbook 写好 |
 | **M1 湖仓基础** | 2026-12-31 | 任意一小时的 `rt_load` 重跑 3 次，行数和校验和不变；至少一周数据进入 Silver；DQ01–DQ12 有违规统计；**mrtfeeder 11 月中旬的新版时刻表被 SCD2 正确捕获**；Bronze 对账零丢失 |
-| **M2 IIPSPW 提交** | 2027-01 上旬 | Proposal 四章齐全，覆盖 guideline 七项内容（§11.1） |
+| **M2 IIPSPW 提交** | 目标 2027-01 上旬；截止约 2027-03-19（推算） | Proposal 四章齐全，覆盖 guideline 七项内容（§11.1）；Word 与 PDF 各一份；amendment form 已签名 |
 | **M3 MVP** | 2027-02-28 | 见下方 MVP 完成标准 |
 | **M3a FYP 1 报告提交** | **2027-04-12 至 04-18**（Sem 1 Week 12） | 五章齐全；Ch4 包含截至 3 月底的初步成果与可行性证据（§11.2） |
 | **M3b FYP 1 presentation** | Week 12 之后（确切日期 ❓） | PPT、代码、MVP 现场演示（看板 + 采集统计） |
@@ -1026,7 +1026,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | References | §11.5 | 检索核实后的文献 |
 | Appendices | summary §4.4、§5；§6 | A：数据源实测证据（10/5、10/11、10/20、10/21）；B：数据脏点目录 E01–E42；C：DQ 规则目录；D：问卷草稿（如适用） |
 
-**④ 时间节点**：2026-11 中旬开始写，先写 Ch3、Ch4（设计书已有素材最多），再写 Ch1、Ch2，最后写摘要；2027-01 上旬提交（校历注明"最好在学期开始前完成"，确切截止日 ❓）。V06/V07 的结果出来后再定稿规模估算的数字。
+**④ 时间节点**：先定标题，同时开始文献检索；2026-11 中旬开始写；目标在 2027-01-25 复学前完成（校历注明"最好在学期开始前完成"）。推算的截止日约为 Sem 1 Week 8 星期五 17:00（2027-03-19 前后，非官方），只作为最后防线：它离 FYP 1 报告提交（Week 12）只有四周。提交方式：Word 和 PDF 各一份，邮件发给导师；Proposal 阶段只有导师，没有 moderator（FYP 1、FYP 2 才有）。V06/V07 的结果出来后再定稿规模估算的数字。
 
 ### 11.2 FYP 1
 
@@ -1217,7 +1217,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 16 GB 内存不够同时运行所有组件 | 开发和实验受限 | 按 profile 启动；基准测试时关闭无关组件 |
 | 数据量比估计的大或小（⏳ V07） | 存储、RQ4 档位需要调整 | V06/V07 实测后更新 §0 和 §14 的数字 |
 | 范围太大 | 做不完 | 按 §10.2 的 MoSCoW 和砍需求顺序推进 |
-| IIPSPW 截止日与两次 presentation 的确切日期未知（报告提交窗口已由校历确认） | 路线图错位 | 复学前向学院确认；路线图按"提前完成"设计 |
+| IIPSPW 截止日（目前只是推算）与两次 presentation 的确切日期未知 | 路线图错位 | 按"复学前完成"设计，推算截止日只作最后防线 |
+| **导师迟迟不回复，换题与 amendment form 签名受阻** | 换题审批延误，Proposal 和 FYP 1 连锁推迟 | 2026-10-26 开学后跟进；同时联系候选导师；必要时询问 FYP 协调老师（my-context §4） |
 | Sem 1 考试周（05-03 至 05-23）与 05-31 硬截止重叠 | 简历前的亮点功能做不完 | 流处理方案 A 和 RQ4 初步基准尽量在 4 月下旬完成；考试后的学期假期作为缓冲 |
 | FYP 2 报告提交提前到 8 月下旬 | 实验时间比原计划少约一个月 | RQ1 实地观测在 FYP 1 期间（P3）就开始；所有实验 8 月上旬前完成 |
 | 问卷可能需要伦理审批 | 需求获取推迟 | 尽早向导师确认流程；问卷不收集可识别个人身份的信息 |
@@ -1256,7 +1257,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | V10、V11 人口与县界 | P3 前 | 决定 Could 项目是否采用 |
 | V12 2027 年假期列表 | P2 前 | DQ28 |
 | V13 trip updates 是否推出 | 每月 | 影响 RQ1 |
-| 确认学校日期 | 2026-12 前 | IIPSPW 截止日；FYP 1、FYP 2 presentation 的日期与形式（报告提交窗口已确认） |
+| 确认学校日期 | 2026-12 前 | IIPSPW 官方截止日（推算为 Sem 1 Week 8 星期五 17:00）；FYP 1、FYP 2 presentation 的日期与形式 |
+| **确定导师并完成换题审批** | 2026-11 中前 | 见 my-context §4 |
 | 确认导师是否接受"工程型 + 评估型"的 FYP | FYP 1 开学时 | v0.2 遗留事项 |
 | 确认问卷的伦理要求 | FYP 1 开学时 | §2 |
 | 选定告警通道（本地关机期间） | P0 | §8.3.6 |
@@ -1537,7 +1539,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 |---|---|---|---|
 | 1 | 英文标题是否改为体现湖仓的版本，例如 *Design and Evaluation of an Open Lakehouse Data Pipeline for Bus Service Reliability Monitoring Using Malaysia's GTFS Realtime Open Data*（FYP 1 标题占 3%） | 暂用原标题 | 写 Proposal 前 |
 | 2 | 本地关机期间的告警通道 | 采集服务在连续失败时调用一个免费的消息推送接口，具体服务待选 | P0 |
-| 3 | 学校日期：IIPSPW 截止日；FYP 1、FYP 2 presentation 的日期与形式 | 报告提交窗口已按校历确认 | 2026-12 前 |
+| 3 | 学校日期：IIPSPW 官方截止日；FYP 1、FYP 2 presentation 的日期与形式 | 报告提交窗口已按校历确认；IIPSPW 截止日推算为 Sem 1 Week 8 星期五 17:00（约 2027-03-19） | 2026-12 前 |
+| 3a | 导师：继续由 Ms. Ashikin 指导，还是换为 Sir Wong Chee Siang | 等待回复，同时接触候选导师（my-context §4） | 2026-11 中前 |
 | 4 | 导师是否接受"工程型 + 评估型"FYP；三份报告之间复用自己文字的规定；问卷是否需要伦理审批 | 按可以接受、按规定处理、问卷不收集个人身份信息 | FYP 1 开学时 |
 | 5 | 最终拿到哪一档 VM | 先走 C 档 | 持续重试 |
 | 6 | ClickHouse 能否通过 Polaris 稳定读取 Iceberg | 备选：Spark 写 ClickHouse staging 表 | P1 做一次技术验证 |

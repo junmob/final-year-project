@@ -1,8 +1,11 @@
 # UTAR Academic Calendar (2027–2028)
 
+> **Before Semester 1**: a short semester starts on **26 Oct 2026** (the student is still on leave of absence). Supervisors may reply only after it starts.
+
 
 ## Semester 1 (25 Jan 2027 – 6 Jun 2027)
 * **Goal**: Proposal complete before semester is ideal; FYP 1 submit at Teaching Week 12
+* **IIPSPW re-submission deadline (unofficial estimate)**: Friday of Week 8, 5 pm, around **19 Mar 2027** (by analogy with the semester starting 7 Jun 2026, whose deadline was 7 Aug 2026 5 pm). Submit Word + PDF by email to the supervisor, together with the FYP 1 amendment form.
 * **Teaching Period**: 25 Jan 2027 – 2 May 2027
   * **Teaching Week 12**: 12 Apr 2027 – 18 Apr 2027 *(FYP 1 submission window)*
 * **Exam Period**: 3 May 2027 – 23 May 2027
