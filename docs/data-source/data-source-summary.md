@@ -631,14 +631,14 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 |---|---|---|
 | 1 | **只有马来文**。文字本身是 ASCII，没有编码问题，风险在于上游可能出现**文档没列出的新值**、大小写或空格变化 | 规范化（去空格、统一大小写）后再映射；未知值告警（DQ22） |
 | 2 | **这是预报，不是实际观测** | 研究问题措辞要准确："预报有雷暴的时段"；实际观测天气作为 FYP 2 可选（§6.1.6） |
-| 3 | **没有历史接口**（💡 推测，需 V01 确认） | 从 P0 开始每天归档 |
+| 3 | **没有历史接口**（✅ 2026-10-20 实测：`?date_start=2026-09-01@date&date_end=2026-09-03@date` 返回 HTTP 200 和空列表 `[]`，只提供当天起 7 天） | 从 P0 开始每天归档（临时由 `weather_archive.yml` 执行，已于 2026-10-20 开始） |
 | 4 | **记录中没有发布时间** | 用采集时间作为发布时间；保存每次快照 |
 | 5 | **同一个目标日期会被预报 7 次**（提前 0 到 6 天），而且每天可能修订 | 建模时保留"预报提前天数"（lead time） |
 | 6 | **地点没有坐标** | 建 `seed_met_location_map.csv`，把巴生谷的地点对应到县和州 |
 | 7 | 地点名称与 DOSM 县名可能不一致 | 人工映射表（实体对齐的一部分） |
 | 8 | `contains` 等过滤是区分大小写的 | 使用 `icontains` 或先确认实际名称 |
 | 9 | 默认返回条数、是否分页未知 | 🟡 2026-10-20 实测：不带参数一次返回全国全部数据（3080 行 = 440 个地点 × 7 天，约 0.9 MB），不需要分页。注意不带结尾斜杠的 URL 会先返回 301 |
-| 10 | 更新时间（每天几点）未知 | 每天采集两次，用内容哈希去重 |
+| 10 | 更新时间（每天几点）未知（❓ V01 剩余项） | 每天采集两次（07:00、19:00 MYT），用内容哈希去重；根据哪一次采集出现新内容、日期范围何时后移来推断更新时间；几天后仍无法判断时临时加密采集频率 |
 
 #### 6.1.4 采集设计
 
@@ -646,7 +646,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 |---|---|
 | 频率 | 每天两次（例如 07:00 和 19:00），用内容哈希去重，同时捕捉当天的修订 |
 | 请求 | 一次取全部（V01 已部分确认），每次采集 1 个请求；全国数据 gzip 后约 24 KB |
-| 范围 | 巴生谷相关的州（W.P. Kuala Lumpur、Selangor、W.P. Putrajaya）及其县、镇（具体 `location_id` 待 V01 确认） |
+| 范围 | 采集时保存全国全部数据（一次请求，gzip 后约 24 KB）；建模时筛选巴生谷相关地点，`location_id` 见 §6.1.7 |
 | Bronze | `bronze/weather_forecast/date=YYYY-MM-DD/fetched_at=HHMMSS.json`，原样保存 |
 | 部署 | 放在 24 小时运行的云端采集服务里，和 GTFS 一起 |
 
@@ -663,6 +663,21 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 - **P3**：县级。站点 → 县（需要县界数据，V11）→ MET 的 `Ds` 地点（通过映射表）。
 
 **时间对齐**：`fct_stop_arrival` 的本地小时 → 所属时段（早、午、晚）→ 对应时段的预报类别和严重程度。
+
+#### 6.1.7 巴生谷相关地点（2026-10-20 实测，V01）
+
+从 `/weather/forecast/` 的全国数据中按名称筛选得到。`location_name` 可能有重名（例如 `Ds058 Kuala Lumpur` 与 `Tn079 Kuala Lumpur`、`Ds049` 与 `Tn061` 都叫 Kuala Selangor），**一律以 `location_id` 作为键**。
+
+| 层级 | `location_id` 与名称 | 用途 |
+|---|---|---|
+| 州（`St`） | `St008` Selangor、`St009` WP Kuala Lumpur、`St010` WP Putrajaya | MVP 州级对齐 |
+| 县（`Ds`） | `Ds049` Kuala Selangor、`Ds051` Hulu Selangor、`Ds054` Klang、`Ds055` Gombak、`Ds057` Petaling、`Ds058` Kuala Lumpur、`Ds060` Kuala Langat、`Ds062` Putrajaya、`Ds063` Hulu Langat、`Ds064` Sepang | P3 县级对齐（需要站点 → 县的映射，V11） |
+| 镇（`Tn`） | `Tn061` Kuala Selangor、`Tn064` Rawang、`Tn065` Selayang、`Tn066` Pelabuhan Klang、`Tn069` Batu Caves、`Tn070` Shah Alam、`Tn074` Damansara、`Tn076` Petaling Jaya、`Tn077` Subang Jaya、`Tn079` Kuala Lumpur、`Tn081` Ampang、`Tn085` Seri Kembangan、`Tn086` Cheras、`Tn087` Cyberjaya、`Tn088` Putrajaya、`Tn090` Kajang、`Tn092` Bangi、`Tn097` Sepang、`Tn155` Gombak (Taman Perwira )、`Tn158` Sri Gombak、`Tn171` Puchong、`Tn181` Klang | 可选：更细粒度的对齐 |
+
+**注意**：
+- 镇级名称中有原始数据自带的多余空格（`Gombak (Taman Perwira )`），映射表要保留原值，另外存一个规范化后的名称。
+- 这是按关键词筛出来的列表，可能有遗漏（例如名称不含这些关键词的巴生谷镇）。建 `seed_met_location_map.csv` 时，应再按县逐一核对一次。
+- 这些地点都没有坐标（坑点 6），对应到县和州仍然需要人工映射表。
 
 #### 6.1.6 决定
 
@@ -946,7 +961,7 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 | ID | 事项 | 方法 | 优先级 |
 |---|---|---|---|
 | **V00** | **每周手动下载三个核心 Static ZIP**（kl、mrtfeeder、rail），按日期命名保存 | 浏览器直接打开端点 | 🔴 **立即开始，持续到 P0 上线** |
-| V01 | 🟡 **部分完成（2026-10-20）**：不分页，一次返回 3080 行，覆盖当天起 7 天；地点类型 Tn 1407、Ds 1176、Rc 259、Dv 126、St 112 行。仍待确认：巴生谷相关的 `location_id` 列表、能否查询过去日期、每天几点更新。原始事项：天气预报实测：响应结构；默认返回条数、是否分页；巴生谷所有相关地点的 `location_id` 和名称；能否查询过去日期；每天几点更新 | 浏览器打开 `/weather/forecast?limit=5&meta=true`，以及 `?icontains=Kuala Lumpur@location__location_name`、`?contains=St@location__location_id`、`?date_start=2026-09-01@date` | 写 Proposal 前 |
+| V01 | 🟡 **大部分完成（2026-10-20）**：① 不分页，一次返回 3080 行（440 个地点 × 7 天），覆盖当天起 7 天；地点类型 Tn 1407、Ds 1176、Rc 259、Dv 126、St 112 行；② ✅ 巴生谷相关 `location_id` 已列出（§6.1.7）；③ ✅ 不能查询过去日期（返回空列表），证实没有历史接口。**仍待确认：每天几点更新**（由天气归档的保存时间推断）。原始事项：天气预报实测：响应结构；默认返回条数、是否分页；巴生谷所有相关地点的 `location_id` 和名称；能否查询过去日期；每天几点更新 | 浏览器打开 `/weather/forecast?limit=5&meta=true`，以及 `?icontains=Kuala Lumpur@location__location_name`、`?contains=St@location__location_id`、`?date_start=2026-09-01@date` | 写 Proposal 前 |
 | V02 | 限流规则：按 IP 全局、按类别，还是按 endpoint | ✅ 2026-10-20 按官方文档确认为按类别独立计数（计数主体未写明，只做 429 监控） | 已完成 |
 | V04 | mrtfeeder `calendar_dates` 全部 5 行内容 | 打开文件 | 写 Proposal 前 |
 | V05 | rapid-bus-kl `trip_id` 序号：Static 中 `U2500` 路线有哪些 `trip_id`？有没有 `_22`、`_23`？ | 在 `trips.txt` 中搜索 `U2500` | 写代码前 |
