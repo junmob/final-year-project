@@ -1209,7 +1209,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 风险 | 影响 | 应对 |
 |---|---|---|
 | 电脑关机导致采集断档 | 数据缺失 | ✅ 已通过架构解决：采集部署在 24 小时运行的云端 VM（§8.3）；用 `fct_feed_health` 记录缺口 |
-| **VM 一直拿不到**（Oracle 新加坡区持续无容量） | P0 推迟，每天丢数据 | C 档先在本地开机时采集；并行申请 GCP e2-micro 作为 B 档；拿到任何一档就先上线 |
+| **VM 一直拿不到**（Oracle 新加坡区持续无容量；Azure for Students 因休学期间学生身份验证失败） | P0 推迟，每天丢数据 | 过渡方案（2026-10-22 决定）：GCP e2-micro（外部 IPv4 若收费则放弃）→ AWS Free Plan（6 个月）→ 复学后 Azure for Students；Oracle 后台继续重试。每次迁移作为切换演练 D1（my-context §5） |
+| Oracle 免费 A1 额度在 2026 年减为 2 OCPU / 12 GB（原 4 / 24） | A 档规格变小 | 采集 + MinIO + Kafka 约 3–4 GB，仍然够用；§8.3.4 的 A 档按新额度理解 |
 | Oracle 回收空闲的 Always Free 实例 | 采集中断 | 上线前阅读官方条款；用健康监控尽早发现；保留切换到另一档的 runbook |
 | GCP 免费出站流量只有每月 1 GB | 同步可能产生费用 | 先压缩再同步，监控每月出站量，中继只在演示和实验时段开启 |
 | API 改版或中断 | 采集失败 | 保存原始文件；schema 检查；告警 |
