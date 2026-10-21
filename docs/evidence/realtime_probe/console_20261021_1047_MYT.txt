@@ -1,0 +1,34 @@
+============================================================
+运营商: rapid-bus-kl
+HTTP 状态码: 200, 文件大小: 8.4 KB
+在线车辆数: 78
+所有字段: ['timestamp', 'trip.tripId', 'trip.startTime', 'trip.startDate', 'trip.routeId', 'position.latitude', 'position.longitude', 'position.bearing', 'position.speed', 'vehicle.id', 'vehicle.licensePlate']
+    timestamp              trip.tripId trip.startTime trip.startDate trip.routeId  position.latitude  position.longitude  position.bearing  position.speed vehicle.id vehicle.licensePlate
+0  1792550729  weekday_U7700_U770001_1       10:04:47       20261021        U7700           3.050889           101.59206             181.6           50.74     W5331R               W5331R
+1  1792550728  weekday_U6000_U600001_9       10:21:28       20261021        U6000           3.073409           101.65838             228.4           40.56    VGK8927              VGK8927
+2  1792550730  weekday_U5900_U590002_2       08:29:51       20261021        U5900           3.029567           101.75916              73.0           48.15   RAPID461             RAPID461
+3  1792550719  weekday_U4200_U420002_2       10:40:08       20261021        U4200           3.143576           101.75711              41.3           17.04    WVE4800              WVE4800
+4  1792550711  weekday_U3000_U300002_1       06:28:19       20261021        U3000           3.122993           101.76836             163.7           37.41    VEQ7949              VEQ7949
+最新 GPS 时间: 2026-10-21 02:45:44+00:00，最旧: 2026-10-21 02:44:40+00:00
+使用 Static 版本: rapid-bus-kl_20261021.zip
+trip.tripId 匹配率: 98.7% (77/78，缺失 0 条)
+   对不上的例子: ['weekday_T7820_T782002_1']
+trip.routeId 匹配率: 100.0% (78/78，缺失 0 条)
+   对不上的例子: []
+============================================================
+运营商: rapid-bus-mrtfeeder
+HTTP 状态码: 200, 文件大小: 9.0 KB
+在线车辆数: 116
+所有字段: ['timestamp', 'trip.tripId', 'trip.routeId', 'position.latitude', 'position.longitude', 'position.bearing', 'position.speed', 'vehicle.id', 'vehicle.licensePlate']
+    timestamp     trip.tripId trip.routeId  position.latitude  position.longitude  position.bearing  position.speed vehicle.id vehicle.licensePlate
+0  1792550775  261002010048S4         T114           3.237836          101.642910             220.0            29.0    VAJ2875              VAJ2875
+1  1792550767  261002010039S7         T805           3.150393          101.569160             133.0            42.0     VG6473               VG6473
+2  1792550767  261002010206S6         T458           2.991292          101.810555              43.0            31.0     VK2906               VK2906
+3  1792550776  261002010202S6         T411           3.079056          101.757480             198.0            42.0     VK2913               VK2913
+4  1792550769  261002010256S4         T464           2.925902          101.758940             334.0             0.0     VM1879               VM1879
+最新 GPS 时间: 2029-10-06 21:45:56+00:00，最旧: 2026-10-21 02:45:07+00:00
+使用 Static 版本: rapid-bus-mrtfeeder_20261021.zip
+trip.tripId 匹配率: 99.1% (115/116，缺失 0 条)
+   对不上的例子: ['241209021024S2']
+trip.routeId 匹配率: 0.0% (0/116，缺失 0 条)
+   对不上的例子: ['T114', 'T805', 'T458', 'T411', 'T464']
