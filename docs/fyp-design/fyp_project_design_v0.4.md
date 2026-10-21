@@ -618,7 +618,8 @@ bronze/
 
 | 情形 | 处理 | 记录 |
 |---|---|---|
-| HTTP 非 200、429、超时 | 跳过本轮，等下一个时间槽，不重试 | 健康日志：`http_error`、`rate_limited`、`timeout` |
+| HTTP 非 200、429、超时、连接失败 | 跳过本轮，等下一个时间槽，不重试 | 健康日志：`http_error`、`rate_limited`、`timeout`、`network_error`（DNS/连接失败） |
+| 落盘失败（磁盘满等） | 跳过本轮 | `write_error` |
 | 返回空 feed（深夜无车） | 正常保存，计为成功 | `ok_empty` |
 | 响应无法解析为 Protobuf | 原样保存到 `_invalid/`，不进入下游 | `parse_error` |
 | 采集进程崩溃 | systemd 10 秒后自动重启 | 重启期间的时间槽没有记录，由网格推算为 `no_record` |
@@ -629,7 +630,7 @@ bronze/
 | 同步校验不一致 | 不删除云端文件，重新拉取；连续失败告警 | 同步记录 |
 | Kafka 不可用（A 档） | 发布器暂停，按检查点恢复；采集不受影响 | `/metrics` |
 
-**断档统计**：`fct_feed_health` 以"预期时间槽网格"为基础（每个 feed 每天 2880 个），左连接实际的健康记录，每个时间槽归入 `ok`、`ok_empty`、`http_error`、`rate_limited`、`timeout`、`parse_error`、`no_record`、`cutover` 之一。这样 VM 宕机这种"没有任何日志"的断档也能被统计。
+**断档统计**：`fct_feed_health` 以"预期时间槽网格"为基础（每个 feed 每天 2880 个），左连接实际的健康记录，每个时间槽归入 `ok`、`ok_empty`、`http_error`、`rate_limited`、`timeout`、`network_error`、`write_error`、`parse_error`、`no_record`、`cutover` 之一。这样 VM 宕机这种"没有任何日志"的断档也能被统计。
 
 **告警**：本地 Prometheus/Grafana 只在本地开机时运行，所以本地关机期间需要一个由采集服务直接发出的告警通道（例如连续 N 个时间槽失败时调用一个免费的消息推送 HTTP 接口）。具体通道待定（§15）。
 
@@ -1209,7 +1210,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 风险 | 影响 | 应对 |
 |---|---|---|
 | 电脑关机导致采集断档 | 数据缺失 | ✅ 已通过架构解决：采集部署在 24 小时运行的云端 VM（§8.3）；用 `fct_feed_health` 记录缺口 |
-| **VM 一直拿不到**（Oracle 新加坡区持续无容量；Azure for Students 因休学期间学生身份验证失败） | P0 推迟，每天丢数据 | 过渡方案（2026-10-22 决定）：GCP e2-micro（外部 IPv4 若收费则放弃）→ AWS Free Plan（6 个月）→ 复学后 Azure for Students；Oracle 后台继续重试。每次迁移作为切换演练 D1（my-context §5） |
+| **VM 一直拿不到**（Oracle 新加坡区持续无容量；Azure for Students 因休学期间学生身份验证失败） | P0 推迟，每天丢数据 | 过渡方案（2026-10-22 决定）：GCP e2-micro（外部 IPv4 若收费则放弃）→ AWS Free Plan（6 个月）→ 复学后 Azure for Students；Oracle 后台继续重试。每次迁移作为切换演练 D1（my-context §5）。✅ 2026-10-22：GCP 绑卡失败，改用 AWS Free Plan，EC2 t3.micro 已上线，B 档方案。Free Plan 项目锁定在 ap-southeast-2（悉尼），到新加坡要升级付费方案；到 api.data.gov.my 的延迟约 200 ms，可以接受。账户 2027-04-22 关闭，必须在此前迁出 |
 | Oracle 免费 A1 额度在 2026 年减为 2 OCPU / 12 GB（原 4 / 24） | A 档规格变小 | 采集 + MinIO + Kafka 约 3–4 GB，仍然够用；§8.3.4 的 A 档按新额度理解 |
 | Oracle 回收空闲的 Always Free 实例 | 采集中断 | 上线前阅读官方条款；用健康监控尽早发现；保留切换到另一档的 runbook |
 | GCP 免费出站流量只有每月 1 GB | 同步可能产生费用 | 先压缩再同步，监控每月出站量，中继只在演示和实验时段开启 |
@@ -1521,8 +1522,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | # | 文件 | 不一致之处 | 建议 |
 |---|---|---|---|
-| 1 | `ingestion/collect_gtfs_rt.py` | 输出根目录是 `data/raw/gtfs_realtime/feed=...`，本设计为 `bronze/gtfs_rt/feed=...`；只采集 RT，没有 Static、天气、每日打包、manifest、`/metrics`、发布器；健康记录没有 `ok_empty`、`parse_error` 等状态分类 | P0 时按 §8.3.3 扩展；状态分类可以在采集端只做轻量的 Protobuf 校验 |
-| 2 | `ingestion/deploy/gtfs-rt-collector.service` | 用户名和路径是占位值 | 部署到 VM 时按实际修改，另外开启 NTP |
+| 1 | `ingestion/collect_gtfs_rt.py` | ✅ 2026-10-22 已改：英文、输出 `bronze/gtfs_rt/...`、轻量 Protobuf 校验分类（`ok`/`ok_empty`/`parse_error` 等，无法解析的存 `_invalid/`）、健康记录带 `instance`；新增 `pack_gtfs_rt.py` 每日打包 + manifest；已部署到 AWS EC2（悉尼）。还缺 Static、天气、`/metrics`、发布器。原问题：输出根目录是 `data/raw/gtfs_realtime/feed=...`，本设计为 `bronze/gtfs_rt/feed=...`；只采集 RT，没有 Static、天气、每日打包、manifest、`/metrics`、发布器；健康记录没有 `ok_empty`、`parse_error` 等状态分类 | P0 时按 §8.3.3 扩展；状态分类可以在采集端只做轻量的 Protobuf 校验 |
+| 2 | `ingestion/deploy/gtfs-rt-collector.service` | ✅ 2026-10-22 已按 VM 实际路径修改，另加 `gtfs-rt-pack.service/.timer` 与 `install.sh`。原问题：用户名和路径是占位值 | 部署到 VM 时按实际修改，另外开启 NTP |
 | 3 | `scripts/download_gtfs_static.py` | 输出为平铺的 `data/raw/gtfs_static/<category>_<YYYYMMDD>.zip` + `manifest.json`，本设计为 `bronze/gtfs_static/feed=/date=/gtfs.zip` + `.sha256`；日期取运行环境的本地日期（GitHub runner 为 UTC），没有重试 | 并入采集服务的 Static 模块时统一路径、显式使用马来西亚时间；`bronze_sync` 负责把已有存档映射到新路径 |
 | 4 | `.github/workflows/backup_gtfs.yml` | ✅ 2026-10-21 已改为每天 04:17 MYT 检查；`download_gtfs_static.py` 改为按文件、按内容哈希去重（`<category>/blobs/` + `snapshots.jsonl`），旧的平铺 ZIP 已导入为快照 | 旧 ZIP 与 `manifest.json` 暂时保留，因为 `realtime_probe.yml` 仍会 `git add` 它们；实测结束、删除 probe workflow 时一并清理 |
 | 5 | `.github/workflows/realtime_probe.yml` | 一次性实测，但 cron 每年同一天都会触发 | 2026-10-21 实测完成后删除（文件内已注明） |

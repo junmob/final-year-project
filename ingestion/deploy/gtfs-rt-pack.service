@@ -1,0 +1,12 @@
+[Unit]
+Description=Pack previous days of GTFS Realtime Bronze files into tar.zst with a manifest
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/fyp
+ExecStart=/home/ubuntu/fyp/.venv/bin/python ingestion/pack_gtfs_rt.py
+Environment=PYTHONUNBUFFERED=1
+Environment=BRONZE_DIR=/home/ubuntu/fyp-data/bronze
+Nice=10
+IOSchedulingClass=idle

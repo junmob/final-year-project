@@ -68,7 +68,7 @@
   2. **AWS 新账户 Free Plan**（最多 200 美元额度，6 个月后自动关闭）作为过渡。
   3. 复学后转到 Azure for Students。每次迁移都按设计书 §8.3.4 的交接规程执行，作为切换演练 D1。
 
-**AWS 账户已开通（2026-10-22）**：Free Plan，赠送额度 100 美元，另可通过 5 项新手任务各得 20 美元（最多再得 100 美元）。**Free Plan 到期日：2027-04-22**，到期或额度用完时账户关闭、资源被删除。**最迟在 2027-04 上旬前**把采集迁移到 Azure（或其他方案），并把全部数据同步回本地。区域使用 ap-southeast-1（新加坡）。
+**AWS 账户已开通（2026-10-22）**：Free Plan，赠送额度 100 美元，另可通过 5 项新手任务各得 20 美元（最多再得 100 美元）。**Free Plan 到期日：2027-04-22**，到期或额度用完时账户关闭、资源被删除。**最迟在 2027-04 上旬前**把采集迁移到 Azure（或其他方案），并把全部数据同步回本地。区域为 ap-southeast-2（悉尼），见下。
 
 **AWS EC2 采集 VM（2026-10-22 建好）**：
 - 实例 `i-0cf3e2c00b50bcf02`（名称 `gtfs-collector`），**区域 ap-southeast-2（悉尼）**：Free Plan 的项目被锁定在悉尼，切换到新加坡需要升级为付费方案（不要升级）。
@@ -76,11 +76,17 @@
 - 安全组 `launch-wizard-1` 只允许本人 IP 的 SSH（175.136.109.166/32）。家用宽带 IP 变了就到 Security Groups 重新选 "My IP"。
 - 登录：WSL 中 `ssh fyp-collector`（`~/.ssh/config` 别名；密钥在 `~/.ssh/fyp-collector.pem`，Windows 下载文件夹另有备份；**绝不能提交到 git**）。
 - 费用估算约 15 美元/月；额度 120 美元（做完 EC2 任务后应为 140 美元），到期日 2027-04-22。
-- 实测：VM 能访问 api.data.gov.my（网址不带结尾 `/` 时会 301 跳转，`requests` 会自动跟随）。
+- 实测：VM 能访问 api.data.gov.my。网址不带结尾 `/` 时会先 301 跳转，等于每次轮询发 2 个请求，所以采集器直接请求带 `/` 的地址（`.../prasarana/?category=`），并关闭自动跳转。
+- **采集器已上线（2026-10-22 01:44 MYT，第一个时间槽 `20261021T174400Z`）**：
+  - 代码在 VM 的 `~/fyp/ingestion/`，从本机用 `rsync -az --delete --exclude __pycache__ ingestion fyp-collector:fyp/` 同步，再执行 `ssh fyp-collector sudo systemctl restart gtfs-rt-collector`。首次安装用 `ingestion/deploy/install.sh`（装 venv、加 1 GB swap、装 systemd 单元）。
+  - 数据在 `~/fyp-data/bronze/`（`gtfs_rt/feed=/date=/hour=/`、`_health/`）。每天 00:30 MYT 由 `gtfs-rt-pack.timer` 打包前一天为 `gtfs_rt/_packs/feed=/date=/rt.tar.zst` + `manifest.json`，校验通过后删除零散文件。
+  - 常用检查：`ssh fyp-collector journalctl -u gtfs-rt-collector -n 20`；`systemctl list-timers gtfs-rt-pack.timer`。
+  - 进程内存约 35 MB；NTP（chrony）已同步；VM 时区保持 UTC。
+  - 还没做：同步到本地（`bronze_sync`）、Static/天气模块并入、`/metrics`、离线告警。
 
 # 6. 交接：下一步待办（2026-10-22）
 
-1. **部署 RT 采集器到 EC2**（P0，最优先）：把 `ingestion/collect_gtfs_rt.py` 改成英文；输出路径改为设计书 §8.3.3 的 `bronze/gtfs_rt/...`；加每日 `tar.zst` 打包 + manifest；systemd 开机自启；开启 NTP。之后再把 Static、天气模块并入采集服务。
+1. ✅ **部署 RT 采集器到 EC2**（2026-10-22 完成，见 §5）。下一步：观察首个完整日（10-22）和 10-23 00:30 的首次打包，看压缩率和断档；然后写本地 `bronze_sync`（rsync 拉打包文件 + 按 manifest 校验）。原待办：把 `ingestion/collect_gtfs_rt.py` 改成英文；输出路径改为设计书 §8.3.3 的 `bronze/gtfs_rt/...`；加每日 `tar.zst` 打包 + manifest；systemd 开机自启；开启 NTP。之后再把 Static、天气模块并入采集服务。
 2. **AWS 新手任务**：确认 "Launch an instance using EC2" 已完成（+20 美元）。Bedrock、Lambda、RDS 三项暂不做。
 3. **10/21 实测收尾**：等最后一次（23:00 那次）结果提交后，把 V06/V07 结论写进 summary；删除 `.github/workflows/realtime_probe.yml`；清理 `data/raw/gtfs_static/` 下旧的平铺 ZIP 和 `manifest.json`（新格式已导入）。
 4. **导师**：给 Sir Wong 发消息（草稿在对话中，可再生成）；10-26 开学后跟进 Ms. Ashikin。

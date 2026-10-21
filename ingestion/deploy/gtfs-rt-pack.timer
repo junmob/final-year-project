@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily GTFS Realtime packing at 00:30 Malaysia time
+
+[Timer]
+OnCalendar=*-*-* 00:30:00 Asia/Kuala_Lumpur
+Persistent=true
+
+[Install]
+WantedBy=timers.target

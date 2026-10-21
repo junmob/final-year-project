@@ -1,17 +1,18 @@
 [Unit]
 Description=GTFS Realtime collector (rapid-bus-kl, rapid-bus-mrtfeeder)
-After=network-online.target
+After=network-online.target time-sync.target
 Wants=network-online.target
 
 [Service]
-# 部署时把 ubuntu 和路径改成 VM 上实际的用户名与仓库位置
 User=ubuntu
-WorkingDirectory=/home/ubuntu/final-year-project
-ExecStart=/home/ubuntu/final-year-project/.venv/bin/python ingestion/collect_gtfs_rt.py
+WorkingDirectory=/home/ubuntu/fyp
+ExecStart=/home/ubuntu/fyp/.venv/bin/python ingestion/collect_gtfs_rt.py
+Environment=PYTHONUNBUFFERED=1
+Environment=BRONZE_DIR=/home/ubuntu/fyp-data/bronze
 Restart=always
 RestartSec=10
-# 日志用 journalctl -u gtfs-rt-collector 查看
-Environment=PYTHONUNBUFFERED=1
+MemoryMax=300M
+# Logs: journalctl -u gtfs-rt-collector
 
 [Install]
 WantedBy=multi-user.target
