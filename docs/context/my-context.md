@@ -2,7 +2,7 @@
 1. **本地硬件配置**：我的电脑是 **16GB RAM**。这符合 `docs/fyp-design/archive/fyp_project_design_v0.3.md`（现已由 v0.4 取代） 中 Docker Compose 分 profile 启动的规划（开发时开 `batch` + `serve` 约 7-9GB，可以跑得动）。
 2. **数据采集运行环境**：我的个人电脑**不能 24 小时开机**。因此，24小时不间断的采集服务（`ingest` profile）我决定后续部署在**免费的云端常驻虚拟机（如 GCP Always Free `e2-micro` 或 Oracle Cloud Free Tier）**上。
 3. **当前阶段重心（2026-10-20 更新）**：采集代码**已经开始写，不再是"先不写"**。当前状态：
-   - **GTFS Static 自动下载已上线**：`scripts/download_gtfs_static.py` + GitHub Actions（`.github/workflows/backup_gtfs.yml`，每周一），按 ZIP 内容指纹判断有无变化，有变化才存档到 `data/raw/gtfs_static/`。
+   - **GTFS Static 每日检查已上线**（2026-10-21 起）：`scripts/download_gtfs_static.py` + GitHub Actions（`.github/workflows/backup_gtfs.yml`，每天 04:17 MYT），按文件、按内容哈希去重，存到 `data/raw/gtfs_static/<category>/`（`blobs/` + `snapshots.jsonl`）。之前是每周一次、整包指纹，已发现会漏掉真实修改并产生伪版本（summary §3.7.1）。
    - **GTFS Realtime 采集脚本已写好并本地测试通过**：`ingestion/collect_gtfs_rt.py`（每 30 秒、两个 feed 错开 15 秒、只存原始 `.pb`、写健康日志）+ systemd 服务文件。**尚未部署**：云端 VM 选定 Oracle Cloud Always Free（新加坡），因该区域暂无容量（A1.Flex 和 E2.1.Micro 均 Out of capacity），正在每天重试；备选 GCP e2-micro。
    - **V06/V07 实测**：由一次性 workflow（`realtime_probe.yml`）在 2026-10-21（周三）马来西亚时间 08:00/13:00/18:00/23:00 自动运行，证据存 `docs/evidence/realtime_probe/`。
    - **仍待完成**：设计书定稿（本文件第 1 点之后的任务）、Proposal 报告重写、采集服务上线。设计书不应再写"先不写采集代码"。现有 `ingestion/` 原型作为可行性证据，并按设计书 v0.4 §8.3 演进为完整的采集服务（2026-10-20 确认）。

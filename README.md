@@ -8,8 +8,8 @@ A Final Year Project (UTAR FICT) that turns Malaysia's open GTFS Realtime bus fe
 
 | Component | Status |
 |---|---|
-| GTFS Static archive (weekly, content-fingerprint versioning) | Live — GitHub Actions |
-| Weather forecast/warning archive (twice daily, temporary) | Live — GitHub Actions |
+| GTFS Static archive (daily check, per-file content-addressed deduplication) | Live — GitHub Actions |
+| Weather forecast/warning archive (every 3 hours, temporary) | Live — GitHub Actions |
 | GTFS Realtime 24/7 collector | Prototype tested locally; cloud VM deployment pending |
 | Lakehouse pipeline, dashboards, experiments | Not started (see roadmap in the design doc) |
 

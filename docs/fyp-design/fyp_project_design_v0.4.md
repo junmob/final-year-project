@@ -8,7 +8,7 @@
 >
 > **依据（冲突时按此顺序裁决）**：
 > 1. [`docs/context/my-context.md`](../context/my-context.md)：个人决策、学校政策、2027 真实时间线
-> 2. [`docs/data-source/data-source-summary.md`](../data-source/data-source-summary.md)（下文简称 **summary**）：数据源事实、实测证据、脏点 E01–E42、限流、辅助数据源决策
+> 2. [`docs/data-source/data-source-summary.md`](../data-source/data-source-summary.md)（下文简称 **summary**）：数据源事实、实测证据、脏点 E01–E44、限流、辅助数据源决策
 > 3. [`fyp_project_design_v0.3.md`](archive/fyp_project_design_v0.3.md)：架构与技术栈（全本地 Docker 湖仓）
 > 4. [`Job_Market.md`](../career/Job_Market.md)：工具选型约束（15 家公司 JD）
 > 5. [`fyp_project_design_v0.2.md`](archive/fyp_project_design_v0.2.md)：业务、指标、数据质量规则、论文结构的原文基础
@@ -26,7 +26,7 @@
 | # | 原因 | 不保存会怎样 |
 |---|---|---|
 | 1 | **API 只返回"此刻"的数据，没有历史接口** | 今天不存，今天的数据就永远拿不到。项目需要几个月的历史才能做趋势和实验 |
-| 2 | **时刻表会变**（mrtfeeder 大约 6 周换一版，现行版本 2026-11-13/15 到期；rapid-rail-kl 2026-12-31 到期；rapid-bus-kl 2027-03-31 到期） | 算 9 月的延误必须用 9 月有效的时刻表。用现在的版本去算，结果是错的 |
+| 2 | **时刻表会变**（mrtfeeder 现行版本 2026-11-13/15 到期，版本周期未知，`calendar` 的起始日期会随导出日期滚动；rapid-bus-kl 在 2026-10-19 至 10-21 之间就改过 `frequencies` 和 `stop_times`；rapid-rail-kl 2026-12-31 到期；rapid-bus-kl 2027-03-31 到期） | 算 9 月的延误必须用 9 月有效的时刻表。用现在的版本去算，结果是错的 |
 | 3 | **处理逻辑一定会改**（例如到站半径、去重规则、修 bug） | 有原始数据，改完逻辑可以**全部重算**（回放/回填）；没有就只能将错就错 |
 | 4 | **实验需要固定的输入** | 批处理与流处理对比（RQ3）、三种引擎对比（RQ4），都必须用同一份数据回放，否则结果没有可比性 |
 | 5 | **可追溯**（数据血缘与审计） | 指标有疑问时，可以一路追回到最原始的那个 `.pb` 文件 |
@@ -37,7 +37,7 @@
 > [!IMPORTANT]
 > 这就是业界的"**不可变原始层**"（immutable raw / Bronze layer）原则：原始数据原样保存、永不修改，所有清洗都在下游完成。面试经常会问到。
 >
-> **当前状态（2026-10-20）**：GTFS Static 已由 GitHub Actions 每周自动存档（按 ZIP 内容指纹判断变化）✅；**GTFS Realtime 尚未 24 小时采集**（云端 VM 仍在等待容量），天气预报尚未归档。在 P0 上线之前，**每过一天就永久损失一天的数据**，所以 P0 是全项目最高优先级（§10）。
+> **当前状态（2026-10-21）**：GTFS Static 已由 GitHub Actions **每天**检查并按文件去重存档 ✅；天气预报与警告由 GitHub Actions 每 3 小时临时归档 ✅；**GTFS Realtime 尚未 24 小时采集**（云端 VM 仍未到手）。在 P0 上线之前，**每过一天就永久损失一天的 Realtime 数据**，所以 P0 是全项目最高优先级（§10）。
 
 ---
 
@@ -139,8 +139,8 @@
 |---|---|---|
 | P1 | **只有位置，没有表现**：没有到站时间、延误、发车间隔 | 官方文档写明目前只有 vehicle position，trip updates 和 service alerts 计划在 2026 年推出，截至本文日期尚未上线（E13，V13 每月检查） |
 | P2 | **没有历史**：API 只返回当下的快照 | 没有历史接口 |
-| P3 | **数据不能直接信任**：时间戳、ID、单位、GPS 都有问题 | summary §5 记录了 E01–E42 共 41 类问题（E21 编号不存在），见 §6 |
-| P4 | **时刻表会变，而且各运营商格式不同** | mrtfeeder 的 `service_id` 带日期，约 6 周一版；`shapes.txt` 的经纬度列顺序各不相同（E18） |
+| P3 | **数据不能直接信任**：时间戳、ID、单位、GPS 都有问题 | summary §5 记录了 E01–E44 共 43 类问题（E21 编号不存在），见 §6 |
+| P4 | **时刻表会变，而且各运营商格式不同** | mrtfeeder 的 `service_id` 带日期，版本周期未知；rapid-bus-kl 两天内就改过发车频率和时刻；`shapes.txt` 的经纬度列顺序各不相同（E18） |
 | P5 | **两种排班模式需要不同的指标** | rapid-bus-kl 按发车间隔排班（`frequencies.txt`，`exact_times=0`），mrtfeeder 按精确班次排班 |
 
 ### 3.2 问题陈述（可以直接用于报告）
@@ -175,7 +175,7 @@
 
 | # | 创新点 | 说明 |
 |---|---|---|
-| N1 | **对马来西亚开放 GTFS-RT 的系统性可靠性测量与数据质量评估** | 把一个国家级开放数据源从"只能看车在哪里"变成可追溯的可靠性指标，并把开放数据本身的质量问题编目（E01–E42）和量化（RQ2） |
+| N1 | **对马来西亚开放 GTFS-RT 的系统性可靠性测量与数据质量评估** | 把一个国家级开放数据源从"只能看车在哪里"变成可追溯的可靠性指标，并把开放数据本身的质量问题编目（E01–E44）和量化（RQ2） |
 | N2 | **同一管道内的双排班模式指标** | 精确班次型（mrtfeeder，OTP）与发车间隔型（rapid-bus-kl，EWT、串车率）在同一星型模型中并存，并通过 SCD2 时刻表版本做 as-of join |
 | N3 | **在没有 trip updates 的条件下从 30 秒稀疏 GPS 推断到站** | 半径法与线性参照插值两种算法，用实地观测和降采样自洽检验做双重验证 |
 | N4 | **基于真实交通遥测数据、可复现的引擎对比** | RQ4 用同一份数据回答"什么规模下才值得用湖仓或分布式引擎"，结论对中小型公共部门数据团队有参考价值 |
@@ -335,7 +335,7 @@ $$
 |---|---|---|
 | D1 | 从 30 秒采样的稀疏 GPS 推断到站时间（没有 trip updates，E13） | 先用半径法，再改进为线性参照插值（第 5 节），全部在 PySpark 中实现 |
 | D2 | ID 对不上：mrtfeeder 的 `routeId` 用的是 `route_long_name`（E01）；`tripId` 匹配率 86% 到 90%（E02） | 建版本化映射表；去掉后缀后再匹配（V05）；用当天的 Static 版本匹配（V06） |
-| D3 | 时刻表版本变化（E32） | 每天检查快照，**内容指纹变了才生成新版本**（SCD Type 2）。指纹按 ZIP 内各文件内容计算，忽略 ZIP 自身的时间戳（现有 `download_gtfs_static.py` 已实现）；Realtime 数据用 as-of join 关联当天有效的版本 |
+| D3 | 时刻表版本变化（E32） | 每天检查快照，分两层处理：**Bronze 按文件、按内容哈希去重存档**（任何字节变化都保留，可还原任意一天的完整内容；`download_gtfs_static.py` 已实现）；**Silver 再判断是否构成真正的新版本**（SCD Type 2），忽略只因 `calendar.txt` 起始日期滚动、行顺序变化或 `__MACOSX/` 打包文件产生的伪变化（summary §3.4.2、§3.7）；Realtime 数据用 as-of join 关联当天有效的版本 |
 | D4 | 服务日期与跨午夜班次 | 时间戳是 UTC epoch，要转成 `Asia/Kuala_Lumpur`；GTFS 时间超过 24 小时要特别处理；mrtfeeder 缺 `startDate`（E05），用时间戳和时刻表推断 |
 | D5 | 重复、乱序、迟到的数据（E07） | 去重键 `(feed, vehicle_id, timestamp)`；Iceberg 用 `MERGE INTO` 或按分区覆盖写入保证幂等；流处理中使用水位线（watermark） |
 | D6 | 各运营商 schema 不同（E17–E19） | 一律按列名读取；每个运营商写一个 staging 转换，统一成标准 schema；时间字符串统一解析 |
@@ -382,7 +382,7 @@ $$
 | DQ28 | 公共假期 | `(holiday_date, state_code)` 唯一；seed 覆盖到"今天 + 90 天" | 唯一性、完整性 | 📊（失败时提醒更新） | summary E41 |
 | DQ29 | 人口 | 只保留 `sex = both`、`age = overall`、`ethnicity = overall`；转换为人数后为正数 | 一致性、有效性 | 🔧 | summary E40 |
 
-### 脏点 → 规则对照表（summary E01–E42）
+### 脏点 → 规则对照表（summary E01–E44）
 
 | E | 问题（简述） | 处理 | 规则或难点 |
 |---|---|---|---|
@@ -427,6 +427,8 @@ $$
 | E40 | 人口表混合多个切片、单位千人 | 🔧 只取 overall，乘以 1000 | DQ29 |
 | E41 | 公共假期没有官方 API | 🔧 dbt seed 人工维护 | DQ28 |
 | E42 | 天气预报实际取值与文档枚举不一致 | 🔧 规范化 + 映射表收录同义写法；新值📊 | DQ22 |
+| E43 | ZIP 内混入 `__MACOSX/` 打包文件 | 🔧 Bronze 标记为 junk，Silver 忽略 | D3 |
+| E44 | 内容不变的重新导出（伪版本） | 🔧 Bronze 按文件去重，Silver 按实体判断版本 | D3 |
 
 ---
 
@@ -788,7 +790,7 @@ flowchart TD
 | 可观测性 | **Prometheus + Grafana** | | 采集成功率、Kafka 消费延迟、容器资源 | P4 |
 | 治理与安全 | **ClickHouse 角色权限** + 车牌加盐哈希 + dbt 血缘与源到目标映射文档 | | engineer / analyst 两种角色；审计追溯 | P3 |
 | 容器 | **Docker Compose**（按 profile 启动） | | 一键复现 | P1 |
-| CI | **GitHub Actions**：ruff、pytest、sqlfluff、用样本数据跑 `dbt build`；另有每周 Static 异地备份（已上线） | | 代码与数据测试自动化 | P3（备份已上线） |
+| CI | **GitHub Actions**：ruff、pytest、sqlfluff、用样本数据跑 `dbt build`；另有每日 Static 检查与按文件去重存档（已上线） | | 代码与数据测试自动化 | P3（备份已上线） |
 
 各组件的具体版本以实施时的稳定版为准，并在 `docker-compose.yml` 中锁定。
 
@@ -1026,7 +1028,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | Ch4.9 Project Complexity | §3.5 | 复杂度论证表 |
 | Ch4.10 Project Plan（可选） | §10.3 | 路线图（甘特图） |
 | References | §11.5 | 检索核实后的文献 |
-| Appendices | summary §4.4、§5；§6 | A：数据源实测证据（10/5、10/11、10/20、10/21）；B：数据脏点目录 E01–E42；C：DQ 规则目录；D：问卷草稿（如适用） |
+| Appendices | summary §4.4、§5；§6 | A：数据源实测证据（10/5、10/11、10/20、10/21）；B：数据脏点目录 E01–E44；C：DQ 规则目录；D：问卷草稿（如适用） |
 
 **④ 时间节点**：先定标题，同时开始文献检索；2026-11 中旬开始写；目标在 2027-01-25 复学前完成（校历注明"最好在学期开始前完成"）。推算的截止日约为 Sem 1 Week 8 星期五 17:00（2027-03-19 前后，非官方），只作为最后防线：它离 FYP 1 报告提交（Week 12）只有四周。提交方式：Word 和 PDF 各一份，邮件发给导师；Proposal 阶段只有导师，没有 moderator（FYP 1、FYP 2 才有）。V06/V07 的结果出来后再定稿规模估算的数字。
 
@@ -1068,9 +1070,9 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | 证据 | 状态（2026-10-20） | 在 Ch4 中的用途 |
 |---|---|---|
-| 数据源剖析与实测（10/5、10/11 两次实测；10/20 云端探测；E01–E42 脏点目录） | ✅ 已有（summary、`docs/evidence/`） | 证明对数据源的理解与问题的真实性 |
+| 数据源剖析与实测（10/5、10/11 两次实测；10/20 云端探测；E01–E44 脏点目录） | ✅ 已有（summary、`docs/evidence/`） | 证明对数据源的理解与问题的真实性 |
 | V06/V07 全天四次实测（2026-10-21） | ⏳ 已排程 | 规模估算、trip 匹配率、全天车辆数曲线 |
-| GTFS Static 自动下载与版本存档（内容指纹，GitHub Actions 每周） | ✅ 已上线 | 证明版本化方案可行 |
+| GTFS Static 每日检查与按文件去重存档（GitHub Actions；`snapshots.jsonl` 记录每天每个文件的哈希） | ✅ 已上线 | 证明版本化方案可行；可统计各运营商的真实更新频率与伪版本比例 |
 | RT 采集原型本地测试 | ✅ 已有 | 采集方案可行 |
 | 云端 VM 部署与连续采集统计（可用率、断档分类） | ❌ 需在 FYP 1 前完成（M0） | O1 的核心证据 |
 | 切换演练 D1、D2 及对账结果 | ❌ 需完成 | 零丢失的证据 |
@@ -1490,7 +1492,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | SLO | v0.2 的单级 SLO 改为"采集层 24/7 + 加工层本地开机期间"两级 | §13.3 |
 | 时间线 | v0.2 的"2027 年 4 月提交"和 v0.3 的"12 月 MVP"作废，按 my-context 与校历重排 | §10 |
 | 数据源范围 | 按 summary §9 更新：客流为次核心、人口可选、天气警告只归档、天气按严重程度映射 | §1、§5、§8 |
-| 数据质量 | 补齐 DQ22–DQ29；新增 E01–E42 对照表；DQ21 改为按时段比较 | §6 |
+| 数据质量 | 补齐 DQ22–DQ29；新增 E01–E44 对照表；DQ21 改为按时段比较 | §6 |
 | 目标与研究问题 | O1–O5 补上可度量标准，新增 O6；RQ3 并入两种流处理方案；RQ4 并入 | §3 |
 | 学校要求带来的补充 | 创新点与复杂度论证、功能与非功能需求、用例、软件工程方法、测试策略、目标达成评估、三份报告的映射、FYP 2 的 H1–H4 假设 | §2、§3.5、§11、§14 |
 | 链接 | v0.3 中指向 `C:/Users/.../.gemini/...` 的失效绝对路径改为仓库相对路径 | 文件头 |
@@ -1521,7 +1523,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 1 | `ingestion/collect_gtfs_rt.py` | 输出根目录是 `data/raw/gtfs_realtime/feed=...`，本设计为 `bronze/gtfs_rt/feed=...`；只采集 RT，没有 Static、天气、每日打包、manifest、`/metrics`、发布器；健康记录没有 `ok_empty`、`parse_error` 等状态分类 | P0 时按 §8.3.3 扩展；状态分类可以在采集端只做轻量的 Protobuf 校验 |
 | 2 | `ingestion/deploy/gtfs-rt-collector.service` | 用户名和路径是占位值 | 部署到 VM 时按实际修改，另外开启 NTP |
 | 3 | `scripts/download_gtfs_static.py` | 输出为平铺的 `data/raw/gtfs_static/<category>_<YYYYMMDD>.zip` + `manifest.json`，本设计为 `bronze/gtfs_static/feed=/date=/gtfs.zip` + `.sha256`；日期取运行环境的本地日期（GitHub runner 为 UTC），没有重试 | 并入采集服务的 Static 模块时统一路径、显式使用马来西亚时间；`bronze_sync` 负责把已有存档映射到新路径 |
-| 4 | `.github/workflows/backup_gtfs.yml` | 每周一次，本设计为云端每天 04:00 检查；ZIP 直接提交进 Git 仓库，仓库会随版本数增长 | 保留为异地备份；注意仓库体积，必要时改为只保留指纹清单 |
+| 4 | `.github/workflows/backup_gtfs.yml` | ✅ 2026-10-21 已改为每天 04:17 MYT 检查；`download_gtfs_static.py` 改为按文件、按内容哈希去重（`<category>/blobs/` + `snapshots.jsonl`），旧的平铺 ZIP 已导入为快照 | 旧 ZIP 与 `manifest.json` 暂时保留，因为 `realtime_probe.yml` 仍会 `git add` 它们；实测结束、删除 probe workflow 时一并清理 |
 | 5 | `.github/workflows/realtime_probe.yml` | 一次性实测，但 cron 每年同一天都会触发 | 2026-10-21 实测完成后删除（文件内已注明） |
 | 6 | summary §7.3 部署分工 | ① 客流文件下载放在云端 VM，本设计改为本地 Airflow（客流文件整份覆盖、含全年历史，代价是本地关机期间可能错过中间的修订版本）；② "演示时在本地临时启动一个采集实例直接写 Kafka"会让 RT 请求翻倍，本设计改为中继和回放；③ "同步后清理 VM 旧文件"改为"磁盘允许时保留完整副本，校验通过后才清理"；④ A 档在云端运行 MinIO 和 Kafka，与"云端不运行 Kafka"不同 | ✅ 2026-10-20 已在 summary §7.3 加注：以本设计 §8.3 为准 |
 | 7 | summary §2.3、§10 的 V02 | summary 中 V02 仍为 ❓ | ✅ 2026-10-20 已更新 |
