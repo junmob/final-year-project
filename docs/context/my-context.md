@@ -70,7 +70,7 @@
 
 **AWS 账户已开通（2026-10-22）**：Free Plan，赠送额度 100 美元，另可通过 5 项新手任务各得 20 美元（最多再得 100 美元）。**Free Plan 到期日：2027-04-22**，到期或额度用完时账户关闭、资源被删除。**最迟在 2027-04 上旬前**把采集迁移到 Azure（或其他方案），并把全部数据同步回本地。区域为 ap-southeast-2（悉尼），见下。
 
-**AWS 控制台登录方式（2026-10-23 确认）**：账户是通过 **AWS Builder ID** 创建的（新版注册流程），**不能**用 root user 或 IAM user 入口登录（会提示账户不存在）。正确做法：打开 `https://console.aws.amazon.com/` → 点登录页顶部提示框的 **"Change to new experience"** → 输入 Builder ID 邮箱和密码。Account ID 只记在私人笔记里，不写进仓库。2026-10-23：完成 Budgets 与 EC2 两项新手任务，**额度 139.61 美元**（EC2 任务是按控制台教程另开一台 `Test Instance` 再删除，采集 VM 未受影响）。`gtfs-collector` 已开启**删除保护**（termination protection）。其余三项（Bedrock、Lambda、RDS）不做：账户按日期到期，额度够用（约 15 美元/月 × 6 个月 ≈ 90 美元）。
+**AWS 控制台登录方式（2026-10-23 确认）**：账户是通过 **AWS Builder ID** 创建的（新版注册流程），**不能**用 root user 或 IAM user 入口登录（会提示账户不存在）。正确做法：打开 `https://console.aws.amazon.com/` → 点登录页顶部提示框的 **"Change to new experience"** → 输入 Builder ID 邮箱和密码。Account ID 只记在私人笔记里，不写进仓库。2026-10-23：完成 Budgets 与 EC2 两项新手任务，**额度 139.61 美元**（EC2 任务是按控制台教程另开一台 `Test Instance` 再删除，采集 VM 未受影响）。`gtfs-collector` 已开启**删除保护和停止保护**（termination protection、stop protection；迁移或确实需要停机时先关掉）。测试用的安全组 `launch-wizard-2` 已删除，只保留 `launch-wizard-1`（采集 VM）与 `default`。其余三项（Bedrock、Lambda、RDS）不做：账户按日期到期，额度够用（约 15 美元/月 × 6 个月 ≈ 90 美元）。
 
 **AWS EC2 采集 VM（2026-10-22 建好）**：
 - 实例 `i-0cf3e2c00b50bcf02`（名称 `gtfs-collector`），**区域 ap-southeast-2（悉尼）**：Free Plan 的项目被锁定在悉尼，切换到新加坡需要升级为付费方案（不要升级）。
