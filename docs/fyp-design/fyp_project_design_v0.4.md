@@ -4,7 +4,7 @@
 >
 > *（Title Case：Development and Evaluation of an Open Lakehouse Data Pipeline for Bus Service Reliability Monitoring Using Malaysia's GTFS Realtime Open Data）*
 >
-> **版本**：v0.4（2026-10-20）。本文是**当前有效的设计基线**，整体取代 `fyp_project_design_v0.2.md` 与 `fyp_project_design_v0.3.md`（两者移到 `docs/fyp-design/archive/` 作为历史，不再维护）。后续会根据 V06/V07 等实测结果、VM 落地情况和实现进展继续迭代（v0.5 及以后），每次修订在文末记录变更。
+> **版本**：v0.4（2026-10-20；2026-10-23 修订范围：RQ3 只做一种流处理、RQ4 精简、新增 stretch 目标 O7/RQ5，见 §15.5）。本文是**当前有效的设计基线**，整体取代 `fyp_project_design_v0.2.md` 与 `fyp_project_design_v0.3.md`（两者移到 `docs/fyp-design/archive/` 作为历史，不再维护）。后续会根据 V06/V07 等实测结果、VM 落地情况和实现进展继续迭代（v0.5 及以后），每次修订在文末记录变更。
 >
 > **依据（冲突时按此顺序裁决）**：
 > 1. [`docs/context/my-context.md`](../context/my-context.md)：个人决策、学校政策、2027 真实时间线
@@ -155,17 +155,19 @@
 | **O2** 数据质量框架 | 对问题数据进行检测、隔离和量化 | DQ01–DQ29 全部实现为自动化测试或作业内检查；每条规则有每日违规统计；quarantine 可回放 |
 | **O3** 到站推断与指标 | 从 GPS 点推断到站事件，计算准点率、发车间隔、额外等待时间、串车等指标 | mrtfeeder 全部路线产出每日和每小时 OTP；rapid-bus-kl 高频路线产出 EWT 与串车率；到站推断覆盖率与精度（RQ1）有实测数字 |
 | **O4** 数据仓库与看板 | 用 Kimball 星型模型构建服务层，并提供可视化看板 | Gold 层 5 张以上事实表通过 dbt 测试；看板 7 个页面可用；P95 查询时间达到 NFR5 |
-| **O5** 流批对比 | 评估批处理与流处理在延迟、准确性和复杂度上的差异 | 实现两种流处理方案（Spark Structured Streaming、ClickHouse Kafka 引擎），与批处理结果比较，量化延迟、差异率、资源与复杂度 |
-| **O6** 引擎对比 | 评估普通关系型数据库、OLAP 数仓和湖仓在写入、转换和查询上的取舍 | PostgreSQL、ClickHouse、Spark + Iceberg 在 W1–W5 五类负载、三档数据量下的耗时、存储、资源数据，并用执行计划解释原因 |
+| **O5** 流批对比 | 评估批处理与流处理在延迟、准确性和复杂度上的差异 | 实现一种流处理方案（Kafka → Spark Structured Streaming → ClickHouse），与批处理结果比较，量化延迟、差异率、资源与复杂度 |
+| **O6** 引擎对比 | 评估普通关系型数据库、OLAP 数仓和湖仓在写入、转换和查询上的取舍 | PostgreSQL、ClickHouse、Spark + Iceberg 在 W1–W5 五类工作负载（W = Workload）、三档数据量下的耗时、存储、资源数据，并用执行计划解释原因 |
+| **O7** Agent 访问层（**stretch**：计划做，不保证完成） | 为 LLM agent 提供机器可读的数据访问层（MCP server：指标定义、字段说明、已知数据问题、只读查询），并评估数据层设计对 agent 回答准确度的影响 | MCP server 可用；50 道带标准答案的题目在 3 种条件下的答对率与幻觉率（RQ5）。未完成时整体转入 Future Work，不影响 O1–O6 |
 
 ### 3.4 研究问题
 
 | RQ | 问题 | 评估方法（详细设计见 §14） | 对应目标 |
 |---|---|---|---|
-| **RQ1** | 用 30 秒采样的 GPS 数据推断到站时间，准确度有多高？ | 阈值敏感性分析；降采样自洽检验；**实地观测** 30 到 50 次真实到站作为对照（MAE） | O3 |
+| **RQ1** | 用 30 秒采样的 GPS 数据推断到站时间，准确度有多高？ | **留出验证**（隐藏恰好停在站点上的 GPS 点，用其余点推断后对比，样本量大、不需要出行）；**实地观测** 30–50 次真实到站作为外部对照（MAE，可请 KL 的朋友按统一规程记录，或在 FYP 1 与 FYP 2 之间的学期假期亲自观测）；降采样自洽检验；物理合理性检查；阈值敏感性分析 | O3 |
 | **RQ2** | 数据质量规则对最终 KPI 有多大影响？ | 同一份数据在"有/无清洗规则"两种情况下计算 KPI，比较差异 | O2 |
-| **RQ3** | 批处理与流处理在这个场景下的取舍是什么？什么时候需要独立的流处理引擎？ | 端到端延迟、结果差异率、迟到数据处理、资源占用、实现复杂度；附加对比流处理方案 A（Kafka → Spark Structured Streaming → ClickHouse）与方案 B（Kafka → ClickHouse Kafka 表引擎 + 物化视图） | O5 |
-| **RQ4** | 对于公共交通遥测数据，普通关系型数据库（PostgreSQL）、OLAP 数仓（ClickHouse）和湖仓（Spark + Iceberg）在**写入、转换和分析查询**上的性能、存储和运维取舍分别是什么？ | 三档数据量 × 四种系统配置 × 五类工作负载的基准测试，用执行计划解释差异 | O6 |
+| **RQ3** | 批处理与流处理在这个场景下的取舍是什么？什么时候需要独立的流处理引擎？ | 同一份 Bronze 数据回放给批处理与流处理（Kafka → Spark Structured Streaming → ClickHouse）两条链路，比较端到端延迟、结果差异率、迟到数据处理、资源占用、实现复杂度 | O5 |
+| **RQ4** | 对于公共交通遥测数据，普通关系型数据库（PostgreSQL）、OLAP 数仓（ClickHouse）和湖仓（Spark + Iceberg）在**写入、转换和分析查询**上的性能、存储和运维取舍分别是什么？ | 三档数据量 × 三种系统 × 五类工作负载（W1–W5）的基准测试，用执行计划解释差异 | O6 |
+| **RQ5**（stretch） | 精选的 Gold 指标层和机器可读的元数据（字段说明、已知数据问题），能把 LLM agent 回答公交可靠性问题的准确率提高多少？对照组是只能访问 Silver | 50 道题 × 3 种条件（只给 Silver 表结构 / 加元数据 / 再加 Gold 指标），本地 7–8B 模型为主，测答对率、幻觉率、重试次数（§14.9） | O7 |
 
 ### 3.5 创新点（Novelty）与项目复杂度论证
 
@@ -180,6 +182,7 @@
 | N3 | **在没有 trip updates 的条件下从 30 秒稀疏 GPS 推断到站** | 半径法与线性参照插值两种算法，用实地观测和降采样自洽检验做双重验证 |
 | N4 | **基于真实交通遥测数据、可复现的引擎对比** | RQ4 用同一份数据回答"什么规模下才值得用湖仓或分布式引擎"，结论对中小型公共部门数据团队有参考价值 |
 | N5 | **断续算力下的零成本混合架构** | 常驻的免费云端采集节点加上间歇开机的本地湖仓，配合零丢失对账、断点追赶和回放，这是资源受限团队可以直接复用的模式（§8） |
+| N7 | **数据质量对 AI agent 可靠性的影响（stretch，RQ5）** | 用本项目编目的真实数据问题（E01–E45）量化"数据层设计"对 LLM agent 答对率和幻觉率的影响；只给 MCP 接口本身不算新颖，新颖之处在于把数据质量工作与 agent 可靠性连起来测量 |
 | N6 | **需求加权可靠性** | 把接驳巴士可靠性与其服务的 MRT 站客流结合，从"测量"走向"决定先改善哪里" |
 
 **复杂度论证**：
@@ -190,7 +193,7 @@
 | 算法 | 稀疏 GPS 到站推断、线性参照投影与插值、发车间隔与 EWT、SCD2 as-of join、跨午夜服务日期推断 |
 | 架构 | 约 11 个组件（Kafka、MinIO、Iceberg、Polaris、Spark、ClickHouse、dbt、Airflow、PostgreSQL、Metabase、Prometheus/Grafana），批流两条链路，湖仓与 OLAP 两层，云端与本地两个节点 |
 | 质量 | 29 条数据质量规则、quarantine、每日对账、SLO |
-| 评估 | 4 个研究问题，包括实地观测、基准测试和流批对照实验 |
+| 评估 | 4 个核心研究问题加 1 个 stretch（RQ5），包括留出验证与实地观测、基准测试、流批对照实验 |
 | 运维 | 24/7 运行、断档记录、切换演练、CI、回放与回填 |
 
 ---
@@ -458,16 +461,17 @@ $$
 > [!NOTE]
 > 数据源本身是**每 30 秒轮询一次**，本质上是微批。所谓"流处理"，是指"轮询程序 → Kafka → 流处理引擎"这条链路。这一点在报告里要诚实说明，它本身也是很好的讨论点。
 
-**流处理支线的范围（刻意保持很小）**：Kafka topic `gtfs.vehicle_positions`（按 feed 分区，消息键为车辆 ID）接收车辆位置 → 计算**实时串车**和**实时在线车辆数** → 写入 ClickHouse 实时表 → 实时页面。用两种方案实现同一组指标：
+**流处理支线的范围（刻意保持很小）**：Kafka topic `gtfs.vehicle_positions`（按 feed 分区，消息键为车辆 ID）接收车辆位置 → 计算**实时串车**和**实时在线车辆数** → 写入 ClickHouse 实时表 → 实时页面。只实现一种方案（2026-10-23 决定）：
 
 | 方案 | 链路 | 特点 |
 |---|---|---|
 | **A** | Kafka → **Spark Structured Streaming**（事件时间窗口加水位线）→ ClickHouse | 独立流处理引擎；与批处理共用 PySpark 代码和到站推断逻辑 |
-| **B** | Kafka → **ClickHouse Kafka 表引擎 + 物化视图** | 不需要 Spark，组件更少；窗口与迟到数据处理能力较弱 |
+
+原设计中的方案 B（Kafka → ClickHouse Kafka 表引擎 + 物化视图）移到 Future Work：它和方案 A 比较的是两种流处理实现，而 RQ3 真正要回答的是"批处理和流处理之间的取舍"，一种流处理方案就足够回答。
 
 Kafka 里的数据从哪里来，取决于最终拿到的 VM 规格：A 档 VM 上的 Kafka 直接接收采集服务发布的实时消息；B 档由本地中继程序从云端拉取最新文件再发布到本地 Kafka，或由回放程序把 Bronze 历史数据按原始节奏重新发布（§8）。这一层额外的延迟在 RQ3 中要单独列出。
 
-**RQ3 的实验设计**（完整设计见 §14）：用同一份原始数据回放给批处理、方案 A、方案 B 三条链路，计算同样的串车指标，以批处理结果为基准，比较：
+**RQ3 的实验设计**（完整设计见 §14）：用同一份原始数据回放给批处理和方案 A 两条链路，计算同样的串车指标，以批处理结果为基准，比较：
 - 端到端延迟（从车辆时间戳到指标可用），并拆分为"数据源延迟 + 采集 + 传输 + 计算"几段
 - 结果差异率（流处理因为迟到数据而漏掉或算错的比例），以及水位线长度对差异率的影响
 - 资源占用（CPU、内存）
@@ -781,7 +785,8 @@ flowchart TD
 | 湖仓表格式 | **Apache Iceberg** | | Raw、Silver、quarantine 的主存储：ACID、schema 演进、时间旅行、分支 | P1 |
 | Catalog | **Apache Polaris**（Iceberg REST Catalog，元数据存放在 PostgreSQL） | iceberg-rest 参考实现 | 统一管理 Iceberg 表，Spark 与 ClickHouse 共用 | P1 |
 | 批处理 | **Apache Spark（PySpark）** | | 解析、清洗、去重、到站推断、线性参照、SCD2，写入 Iceberg | P1 |
-| 流处理 | 方案 A：**Spark Structured Streaming**；方案 B：**ClickHouse Kafka 表引擎 + 物化视图** | | 实时串车、在线车辆数；RQ3 对比 | P4 |
+| 流处理 | **Spark Structured Streaming** | ClickHouse Kafka 表引擎（Future Work） | 实时串车、在线车辆数；RQ3 对比 | P4 |
+| Agent 访问层（stretch） | **MCP server**（Python 官方 MCP SDK）+ 本地 LLM（**Ollama**，7–8B 4-bit 量化模型，GTX 1660 Super 6 GB 显存）；可选一个免费额度的 API 模型作对照 | | 指标定义、字段说明（读 dbt `manifest.json`/`catalog.json`）、已知数据问题、只读查询；RQ5 评测 | P5 |
 | OLAP 服务层 | **ClickHouse** | | Gold 星型模型、实时表、看板查询、RBAC | P2 |
 | 转换 | **dbt-core + dbt-clickhouse**，使用增量模型、Jinja 宏、model contracts、tests、docs、seeds | | 构建 Gold；假期、天气映射等 seed | P2 |
 | 编排 | **Apache Airflow**，使用 Sensor、自定义 Operator、XCom、重试、SLA 回调、`catchup` | | 全部批处理编排 | P2 |
@@ -826,7 +831,7 @@ flowchart TD
 | Kimball 星型模型、SCD2 | Gold 层设计 | MoneyLion、Ant、Ambition |
 | 数据质量、SLA、幂等、零数据丢失 | 29 条规则、quarantine、对账、切换演练 | Grab、GXBank、Carsome、Boost、TNG、Ant |
 | SQL 与引擎调优（执行计划、分区） | RQ4 基准测试 | Tencent、MoneyLion、Ambition、ONL |
-| 批流一体 | 批处理 + 两种流处理方案 | Grab、Tencent、TNG、ONL |
+| 批流一体 | 批处理 + Spark Structured Streaming | Grab、Tencent、TNG、ONL |
 | RBAC、脱敏、审计 | ClickHouse 角色、车牌哈希、血缘 | GXBank、Roche、Ant |
 | 实体对齐（MDM） | `dim_location`、车辆对齐 | Carsome |
 | 数据映射文档 | 源到目标映射 | Tranglo |
@@ -891,10 +896,11 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 |---|---|
 | **Must**（不能砍） | 24/7 采集与 Bronze 对账；Spark → Iceberg 的 Raw 与 Silver；Static SCD2；DQ01–DQ21 中的核心规则与 quarantine；到站推断（半径法 + 线性参照）；mrtfeeder OTP 与 rapid-bus-kl EWT、串车；ClickHouse + dbt 的 Gold 星型模型；Airflow 全流程；Metabase 看板 ①②③⑥；幂等与对账；SLO 与切换演练；实体对齐；RQ1、RQ2、RQ4 |
 | **Should** | 流处理方案 A（Spark Structured Streaming）与 RQ3；天气（州级）与看板 ⑤；Rapid Rail OD 客流与看板 ⑦；RBAC 与车牌脱敏；CI；Prometheus + Grafana |
-| **Could** | 流处理方案 B（ClickHouse Kafka 引擎）；县级天气与行政区人口（取决于 V11）；天气警告的事件标记；实际观测天气（Open-Meteo）；A 档 VM 上 24 小时在线 demo |
-| **Won't**（本项目不做） | 机器学习到站预测；NL2SQL；云数仓移植；其他州的 BAS.MY |
+| **Should（stretch）** | Agent 访问层（MCP server）与 RQ5：计划做，不保证完成；放在 FYP 2，Gold 完成之后 |
+| **Could** | 县级天气与行政区人口（取决于 V11）；天气警告的事件标记；实际观测天气（Open-Meteo）；A 档 VM 上 24 小时在线 demo |
+| **Won't**（本项目不做） | 机器学习到站预测；流处理方案 B（ClickHouse Kafka 引擎）；RQ4 的"PostgreSQL 按日分区"配置与 W6 大表 JOIN；云数仓移植；其他州的 BAS.MY |
 
-**时间不够时的砍需求顺序**：县级天气与人口 → 天气警告 → 实际观测天气 → 流处理方案 B → Prometheus/Grafana（管道健康退回 Metabase 页面 ⑥）。**不要砍**：数据质量、SLA、实体对齐、幂等加载、RQ4。这些是 junior 岗位最看重的，也是学生项目最缺的。
+**时间不够时的砍需求顺序**：县级天气与人口 → 天气警告 → 实际观测天气 → RQ5 缩为 2 种条件 → Prometheus/Grafana（管道健康退回 Metabase 页面 ⑥）→ RQ5 整体转入 Future Work → RQ3 只测延迟。**不要砍**：数据质量、SLA、实体对齐、幂等加载、RQ4。这些是 junior 岗位最看重的，也是学生项目最缺的。
 
 ### 10.3 路线图（2026-10 → 2027-09）
 
@@ -907,8 +913,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | **IIPSPW 提交** | **目标 2027-01 上旬（复学前）；推算的截止日约为 Sem 1 Week 8 星期五 17:00，即 2027-03-19 前后（非官方）** | ⭐ 提交重写版 Proposal（纯文字，Word + PDF 发邮件给导师）+ FYP 1 amendment form（导师签名；换导师则两位都签） | | |
 | **P2 MVP** | 2026-12 → 2027-02 | FYP 1 开学（01-25）；写 FYP 1 Ch1–Ch3（大部分从 Proposal 扩写） | ClickHouse + dbt-clickhouse 构建 Gold；半径法到站推断；试点路线 OTP；至少 10 条 DQ 规则以测试形式运行；Airflow 串起全流程；Metabase 看板 ①②⑥；假期 seed | 整理 README 初版 |
 | **P3 全面推广** | 2027-03 → 2027-04 | 3 月写 FYP 1 Ch4（成果截至 3 月底）与 Ch5；⭐ **FYP 1 报告在 Week 12（04-12 至 04-18）提交**；随后 presentation（PPT + 代码 + MVP 现场演示，确切日期 ❓） | mrtfeeder 全部路线；rapid-bus-kl 发车间隔、EWT、串车；线性参照插值；天气（州级）；客流回填（2023 年起）与每日 MERGE；`dim_location` 实体对齐；RBAC 与脱敏；CI；SLO 与切换演练；dbt docs；看板 ③④⑤⑦ | 练 SQL 题与 CS 基础 |
-| **P4 亮点收尾** | 2027-04-19 → 05-31（**05-31 硬截止**） | 05-03 至 05-23 考试周（开发时间会被压缩，主要工作放在 4 月下旬和 05-24 起的学期假期） | 流处理方案 A（方案 B 视时间）；Prometheus/Grafana；RQ4 初步基准（1 周、1 个月两档）；README、架构图、2 分钟 demo 视频 | ⭐ 简历定稿，写入真实数字 |
-| **P5 实验补齐** | 2027-06-07 → 2027-08-08 | FYP 2 开学（06-07）：RQ1–RQ4 完整实验**在 8 月上旬前全部完成**；同步写 Ch3–Ch6 | RQ1 实地观测（30–50 次到站）与敏感性分析；RQ2 消融实验；RQ3 完整对比；RQ4 "全部数据"档；Could 项目视时间 | **大规模投递实习，参加面试** |
+| **P4 亮点收尾** | 2027-04-19 → 05-31（**05-31 硬截止**） | 05-03 至 05-23 考试周（开发时间会被压缩，主要工作放在 4 月下旬和 05-24 起的学期假期） | 流处理（Spark Structured Streaming）；Prometheus/Grafana；RQ4 初步基准（1 周、1 个月两档）；README、架构图、2 分钟 demo 视频 | ⭐ 简历定稿，写入真实数字 |
+| **P5 实验补齐** | 2027-06-07 → 2027-08-08 | FYP 2 开学（06-07）：RQ1–RQ4 完整实验**在 8 月上旬前全部完成**；同步写 Ch3–Ch6 | RQ1 留出验证、实地观测（30–50 次到站；05-24 至 06-06 学期假期亲自去 KL，或请 KL 的朋友按规程记录）与敏感性分析；RQ2 消融实验；RQ3 完整对比；RQ4 "全部数据"档；**RQ5（stretch）**：MCP server、50 道题与评测；Could 项目视时间 | **大规模投递实习，参加面试** |
 | **P6 报告与答辩** | 2027-08-09 → 2027-09-12 | ⭐ **FYP 2 报告在 Week 12（08-23 至 08-29）提交**；随后 presentation（PPT + 代码 + A4 海报，确切日期 ❓）；09-13 起考试周 | 冻结代码，打 tag，归档实验结果 | 面试中讲解项目 |
 | 实习 | 2027-10-18 起 | | | 实习结束后投 Junior DE 正职 |
 
@@ -918,7 +924,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 |---|---|
 | 采集已连续运行数月，有真实的可用率数字 | RQ1 的实地观测与完整敏感性分析 |
 | Spark + Iceberg + ClickHouse + dbt + Airflow + Metabase 全链路跑通 | RQ2 的逐条规则消融实验 |
-| 两种排班模式的指标（OTP、EWT、串车）都能在看板上查看 | RQ3 的完整流批对比（含方案 B） |
+| 两种排班模式的指标（OTP、EWT、串车）都能在看板上查看 | RQ3 的完整流批对比 |
 | 至少一种流处理方案可演示 | RQ4 的"全部数据"档与执行计划深入分析 |
 | 数据质量框架、对账、SLO、至少一次切换演练 | 县级天气、人口、实际观测天气等 Could 项目 |
 | RQ4 初步数字（1 周、1 个月两档） | FYP 2 报告、海报、答辩 |
@@ -936,7 +942,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | **M3b FYP 1 presentation** | Week 12 之后（确切日期 ❓） | PPT、代码、MVP 现场演示（看板 + 采集统计） |
 | **M4 全面推广** | 2027-04-30 | 两种排班模式的指标覆盖全部核心路线；看板 7 页中至少 6 页可用；实体对齐有精确率和召回率；完成一次切换演练并附对账结果 |
 | **M5 简历就绪** | **2027-05-31** | §10.4 左列全部完成；README 按步骤可以在一台新电脑上复现 |
-| **M6 FYP 2 报告提交** | **2027-08-23 至 08-29**（Sem 2 Week 12） | RQ1–RQ4 全部有结果；七章报告完成 |
+| **M6 FYP 2 报告提交** | **2027-08-23 至 08-29**（Sem 2 Week 12） | RQ1–RQ4 全部有结果；RQ5 有结果，或写入 Future Work；七章报告完成 |
 | **M7 FYP 2 presentation** | Week 12 之后、09-12 之前（确切日期 ❓） | PPT、代码（打 tag 冻结）、A4 海报、现场演示 |
 
 ### 10.6 MVP 完成标准（M3）
@@ -1024,7 +1030,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | Ch4.4 Data Layering and Modelling | §8.4、§8.5 | 分层表、星型模型 |
 | Ch4.5 Metrics and Algorithms | §5 | 公式（按 guideline 编号为 (4.1)、(4.2)……） |
 | Ch4.6 Data Quality Framework | §6 | DQ 规则目录（完整表放附录） |
-| Ch4.7 Tools and Technologies | §9.2、§9.4 | 组件职责表；**每个子目标用到哪些技术、为什么**（guideline 要求按子目标说明理由：O1 → 采集服务 + MinIO；O2 → Spark + dbt tests；O3 → PySpark；O4 → ClickHouse + dbt + Metabase；O5 → Kafka + 两种流处理方案；O6 → PostgreSQL、ClickHouse、Spark + Iceberg） |
+| Ch4.7 Tools and Technologies | §9.2、§9.4 | 组件职责表；**每个子目标用到哪些技术、为什么**（guideline 要求按子目标说明理由：O1 → 采集服务 + MinIO；O2 → Spark + dbt tests；O3 → PySpark；O4 → ClickHouse + dbt + Metabase；O5 → Kafka + Spark Structured Streaming；O6 → PostgreSQL、ClickHouse、Spark + Iceberg） |
 | Ch4.8 Testing, Validation and Evaluation Plan | §14.2–§14.6 | 测试策略；RQ1–RQ4 实验设计 |
 | Ch4.9 Project Complexity | §3.5 | 复杂度论证表 |
 | Ch4.10 Project Plan（可选） | §10.3 | 路线图（甘特图） |
@@ -1092,7 +1098,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 - **评分重点**：Technical Achievement 50%，其中 **Evaluation and Analysis 15%**、Prototyping 10%、General 15%、**Contribution/Innovation 10%**。报告 30%，其中 Implementation 5%、Experimental Results 5%、Conclusion 5%、Problem Analysis and **Hypothesis** 3%、**Modelling** 3% 等。Presentation 10%，General Effort 10%。
 - **提交**：Sem 2 Teaching Week 12（2027-08-23 至 08-29）交报告，之后做 presentation，需要 PPT、代码和海报（确切日期 ❓）。
 
-**② 本阶段交付**：完整系统（§10.4 两列全部完成）；RQ1–RQ4 的完整实验结果；冻结并打 tag 的代码仓库；报告、PPT、海报和现场演示。评分中的 "Hypothesis" 要求每个 RQ 都有明确的假设：H1（线性参照的 MAE 显著低于半径法）、H2（DQ 规则会显著改变至少一个核心 KPI）、H3（在 30 秒轮询的数据源上，流处理的端到端延迟优势有限，而结果差异率不可忽略）、H4（§14.6 列出的预期结论）。"Modelling" 对应 §8.5 的星型模型与 §5 的指标模型。
+**② 本阶段交付**：完整系统（§10.4 两列全部完成）；RQ1–RQ4 的完整实验结果；冻结并打 tag 的代码仓库；报告、PPT、海报和现场演示。评分中的 "Hypothesis" 要求每个 RQ 都有明确的假设：H1（线性参照的 MAE 显著低于半径法）、H2（DQ 规则会显著改变至少一个核心 KPI）、H3（在 30 秒轮询的数据源上，流处理的端到端延迟优势有限，而结果差异率不可忽略）、H4（§14.6 列出的预期结论）；若完成 RQ5，再加 H5（加入 Gold 指标与元数据后，agent 的答对率显著高于只给 Silver，幻觉率显著降低）。"Modelling" 对应 §8.5 的星型模型与 §5 的指标模型。
 
 **③ 章节 → 设计书映射**
 
@@ -1117,8 +1123,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | Ch6.1 System Testing and Performance Metrics | §14.2、§2.2、§13.3 | FYP 1 Ch3.1 的验证计划改写为实际执行的测试 |
 | Ch6.2 Testing Setup and Result | §14.3–§14.7 | 新写：6.2.1 RQ1、6.2.2 RQ2、6.2.3 RQ3、6.2.4 RQ4、6.2.5 SLO 与其他评估 |
 | Ch6.3 Project Challenges | §12.1、§14.6 | 新写：架构取舍的讨论（例如"分布式不是越早上越好"） |
-| Ch6.4 Objectives Evaluation | §14.8 | 新写：O1–O6 逐条对照证据 |
-| Ch7.1 Conclusion、Ch7.2 Recommendation | §1 范围外、§10.2 Won't | 新写：Future Work（机器学习到站预测、官方 trip updates、更多运营商、NL2SQL、实际观测天气） |
+| Ch6.4 Objectives Evaluation | §14.8 | 新写：O1–O6 逐条对照证据；O7 写完成情况或转入 Future Work 的原因 |
+| Ch7.1 Conclusion、Ch7.2 Recommendation | §1 范围外、§10.2 Won't | 新写：Future Work（机器学习到站预测、官方 trip updates、更多运营商、流处理方案 B、实际观测天气；若 RQ5 未完成，写入 agent 访问层的设计与已完成部分） |
 
 **RQ1–RQ4 分别落在哪几章**：
 
@@ -1189,7 +1195,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | Airflow DAG、Sensor、`catchup` 和告警 | **Airflow**, orchestration, monitoring | "为什么 30 秒采集不放进 Airflow？" |
 | Iceberg + Polaris、小文件合并、快照维护 | **Iceberg**, lakehouse, compaction | "湖仓表格式解决了什么问题？小文件怎么处理？" |
 | PySpark 线性参照与到站推断 | **Spark**, SQL, geospatial | "到站时间怎么从 GPS 推出来？" |
-| Kafka + 两种流处理方案 | **Kafka**, **Spark Structured Streaming**, watermark | "迟到数据怎么处理？什么时候该用流处理？" |
+| Kafka + Spark Structured Streaming | **Kafka**, **Spark Structured Streaming**, watermark | "迟到数据怎么处理？什么时候该用流处理？" |
 | ClickHouse 服务层与 RQ4 | **ClickHouse**, OLAP, query tuning | "列存为什么快？Postgres 什么时候反而更好？" |
 | 切换演练 | **cutover**, migration | "上游系统变了，怎么保证不丢数据？" |
 | Docker Compose、GitHub Actions、云端 VM 运维 | **Docker**, **CI/CD**, Linux | "别人怎么复现你的环境？" |
@@ -1210,7 +1216,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 风险 | 影响 | 应对 |
 |---|---|---|
 | 电脑关机导致采集断档 | 数据缺失 | ✅ 已通过架构解决：采集部署在 24 小时运行的云端 VM（§8.3）；用 `fct_feed_health` 记录缺口 |
-| **VM 一直拿不到**（Oracle 新加坡区持续无容量；Azure for Students 因休学期间学生身份验证失败） | P0 推迟，每天丢数据 | 过渡方案（2026-10-22 决定）：GCP e2-micro（外部 IPv4 若收费则放弃）→ AWS Free Plan（6 个月）→ 复学后 Azure for Students；Oracle 后台继续重试。每次迁移作为切换演练 D1（my-context §5）。✅ 2026-10-22：GCP 绑卡失败，改用 AWS Free Plan，EC2 t3.micro 已上线，B 档方案。Free Plan 项目锁定在 ap-southeast-2（悉尼），到新加坡要升级付费方案；到 api.data.gov.my 的延迟约 200 ms，可以接受。账户 2027-04-22 关闭，必须在此前迁出 |
+| **VM 一直拿不到**（Oracle 新加坡区持续无容量；Azure for Students 因休学期间学生身份验证失败） | P0 推迟，每天丢数据 | 过渡方案（2026-10-22 决定）：GCP e2-micro（外部 IPv4 若收费则放弃）→ AWS Free Plan（6 个月）→ 复学后 Azure for Students（❌ 2026-10-22：在读同学用 UTAR 邮箱同样失败，不再作为后续方案）；Oracle 后台继续重试。每次迁移作为切换演练 D1（my-context §5）。✅ 2026-10-22：GCP 绑卡失败，改用 AWS Free Plan，EC2 t3.micro 已上线，B 档方案。Free Plan 项目锁定在 ap-southeast-2（悉尼），到新加坡要升级付费方案；到 api.data.gov.my 的延迟约 200 ms，可以接受。账户 2027-04-22 关闭，必须在此前迁出 |
 | Oracle 免费 A1 额度在 2026 年减为 2 OCPU / 12 GB（原 4 / 24） | A 档规格变小 | 采集 + MinIO + Kafka 约 3–4 GB，仍然够用；§8.3.4 的 A 档按新额度理解 |
 | Oracle 回收空闲的 Always Free 实例 | 采集中断 | 上线前阅读官方条款；用健康监控尽早发现；保留切换到另一档的 runbook |
 | GCP 免费出站流量只有每月 1 GB | 同步可能产生费用 | 先压缩再同步，监控每月出站量，中继只在演示和实验时段开启 |
@@ -1243,7 +1249,10 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | Iceberg Catalog | Apache Polaris | 2026-10-20 确认 |
 | 空间计算 | 纯 PySpark 加 ClickHouse，Sedona 只作备选 | 2026-10-20 确认 |
 | 看板 | Metabase，Superset 作备选 | 2026-10-20 确认 |
-| NL2SQL | Future Work | 2026-10-20 确认 |
+| NL2SQL / Agent 访问层 | 2026-10-20 定为 Future Work；**2026-10-23 改为 stretch 目标 O7/RQ5**（MCP server + 本地 LLM，FYP 2 再做，不保证完成） | 2026-10-23 确认 |
+| 流处理 | 只做 Spark Structured Streaming，方案 B 移到 Future Work | 2026-10-23 确认 |
+| RQ4 配置 | 3 种系统（去掉"PostgreSQL 按日分区"），W1–W5（去掉 W6） | 2026-10-23 确认 |
+| 标题 | 保持不变；RQ5 不一定完成，不写进标题 | 2026-10-23 确认 |
 | 云端 24 小时 demo | A 档可选，不进入主架构 | 2026-10-20 确认 |
 | 原型的地位 | 作为可行性证据，演进为本设计的采集服务 | 2026-10-20 确认 |
 | BAS.MY 等其他运营商 | 不纳入核心范围，BAS.MY Ipoh 可作为可选扩展 | summary §9 |
@@ -1268,6 +1277,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 确认导师是否接受"工程型 + 评估型"的 FYP | FYP 1 开学时 | v0.2 遗留事项 |
 | 确认问卷的伦理要求 | FYP 1 开学时 | §2 |
 | 选定告警通道（本地关机期间） | P0 | §8.3.6 |
+| **演示方案**（没有笔记本，presentation 默认线下） | FYP 1 presentation 前（2027-04） | 待定：演示视频必备；学校电脑用 Chrome Remote Desktop 连回家中桌机；或演示当天临时开云端 VM 跑精简组合；确认能否申请线上演示。注意 AWS 账户 2027-04-22 关闭 |
+| **AWS 到期后的采集 VM** | 2027-04 前 | Azure for Students 不可行；候选：Oracle 继续重试、每月约 4–6 美元的小 VPS、最后几个月只在本地开机时采集 |
 
 ---
 
@@ -1292,7 +1303,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | **Airflow 进阶**（Sensor、自定义 Operator、XCom） | GXBank、Roche | ✅ §8.6 |
 | **Kimball 维度建模、分层设计** | MoneyLion、Ant、Ambition | ✅ 星型模型 + Bronze/Silver/Gold 分层 |
 | **Spark** | Shopee、Tencent、Ant、Boost、TNG、ONL、Ambition、Focal、EY | ✅ **核心组件**，P1 起用于全部批处理，P4 用于流处理 |
-| **Kafka、流批一体** | Grab、Tencent、MoneyLion、TNG、ONL | ✅ P1 接入，P4 两种流处理方案 |
+| **Kafka、流批一体** | Grab、Tencent、MoneyLion、TNG、ONL | ✅ P1 接入，P4 Spark Structured Streaming |
 | **湖仓开放表格式（Iceberg）与 REST Catalog** | MoneyLion、ONL | ✅ **核心组件**：Iceberg + Polaris |
 | **ClickHouse / OLAP** | Shopee、ONL | ✅ **核心组件**：Gold 服务层与实时表（v0.2 曾写"不纳入"，已改） |
 | **RBAC、脱敏、审计、合规** | GXBank、Roche、Ant | ✅ ClickHouse 角色 + 车牌加盐哈希 + 血缘 |
@@ -1305,7 +1316,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | **成本控制（FinOps）** | GXBank、Tier 2 普遍 | 🟡 零成本约束下的架构取舍；RQ4 测量存储与资源，体现成本意识 |
 | **CDC（Debezium）** | ONL、Focal、Ambition | ❌ 不纳入。数据源是 API 轮询，没有业务数据库可做 CDC，硬加会显得牵强。面试时能讲清概念即可 |
 | **Flink** | Ant、ONL、Tencent（流批） | ❌ 不纳入，写进论文的方案讨论；流处理用 Spark Structured Streaming 覆盖水位线、状态等概念 |
-| **AI + Data**（LLM、RAG、AI 辅助开发） | Shopee、MoneyLion | 🟡 NL2SQL 列为 Future Work；开发过程中使用 AI 辅助开发工具的经验可以在面试中如实介绍 |
+| **AI + Data**（LLM、RAG、AI 辅助开发） | Shopee、MoneyLion | 🟡 Agent 访问层（MCP）与 RQ5 列为 stretch 目标；开发过程中使用 AI 辅助开发工具的经验可以在面试中如实介绍 |
 | **CS 基础、LeetCode** | Shopee、Tranglo | ❌ **FYP 覆盖不了**，需要单独准备 |
 | **中英双语沟通** | Tencent、Ant | ❌ FYP 覆盖不了；README 和 demo 视频做英文版 |
 
@@ -1409,9 +1420,11 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | 维度 | 设计 |
 |---|---|
-| 对照数据 | **实地观测**：在 2–3 条试点 mrtfeeder 路线的若干站点记录 30–50 次真实到站（手机时间已与网络时间同步，记录站点、车牌或车辆编号、到站时刻） |
+| 主要验证：留出验证（hold-out） | 在全部数据中找出"恰好停在站点上"的 GPS 点（距站点 ≤ 15 米、速度接近 0），把它们当作近似真实的到站时刻。**把这个点隐藏**，只用前后其他点推断，再与隐藏点的时间对比。样本量可达数千次，不需要出行。局限：这类样本偏向"车在站点停靠"的情况，所以还需要实地观测作外部对照 |
+| 外部对照：实地观测 | 在 2–3 条试点 mrtfeeder 路线的若干站点记录 30–50 次真实到站（手机时间已与网络时间同步，记录站点、车牌或车辆编号、到站时刻）。本人住在霹雳州金宝，所以：① 在 FYP 1 与 FYP 2 之间的学期假期（约 2027-05-24 至 06-06）亲自去 KL；或 ② 请 KL 的朋友按统一的记录表和规程记录。实地观测同时用来检验留出验证的结论是否可信 |
+| 物理合理性检查 | 推断结果必须符合物理规律：相邻两站之间的推断速度不超过上限（例如 90 km/h），同一班次内到站顺序与站序一致，到站时间不早于发车时间。这类检查只能发现明显错误，不能单独证明准确 |
 | 指标 | 平均绝对误差 MAE、误差中位数、系统偏差（平均有符号误差）、±60 秒内的比例、到站推断覆盖率 |
-| 方法对比 | 半径法（$r$ = 30、50、100、150 米）与线性参照插值 |
+| 方法对比 | 半径法（$r$ = 30、50、100、150 米）与线性参照插值。这两种是设计阶段根据已有知识提出的候选方法，**文献综述要检验它们**：找出已有研究用过哪些方法（例如基于隐马尔可夫模型的地图匹配），比较优缺点，并据此确认或调整方案 |
 | 敏感性分析 | 改变半径、断档阈值（60、120、180 秒）、准点窗口，观察 OTP 的变化 |
 | 降采样自洽检验 | 把 30 秒数据降采样为 60 秒和 90 秒，用 30 秒的推断结果作参照，画出误差随采样间隔增长的曲线 |
 | 补充参照 | 如果官方推出 trip updates（V13），把官方到站时间作为额外参照 |
@@ -1430,7 +1443,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | 维度 | 设计 |
 |---|---|
-| 链路 | 批处理（基准）；流处理方案 A：Kafka → Spark Structured Streaming → ClickHouse；方案 B：Kafka → ClickHouse Kafka 表引擎 + 物化视图 |
+| 链路 | 批处理（基准）；流处理：Kafka → Spark Structured Streaming → ClickHouse |
 | 输入 | 同一段 Bronze 数据：24 小时窗口按 1 倍速回放，一周窗口按 10 倍速回放 |
 | 指标 | 实时串车、在线车辆数 |
 | 测量 | 端到端延迟（拆分为数据源延迟、采集、传输、计算几段；B 档中继带来的额外延迟单独列出）；与批处理结果的差异率；水位线长度（0、30、60、120、300 秒）对差异率的影响；CPU 与内存；组件数、代码行数、需要处理的故障情形 |
@@ -1443,8 +1456,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 维度 | 设置 |
 |---|---|
 | 数据量 | 1 周、1 个月、全部（约 6 个月，约 1 亿行，⏳ 待 V07 校准）三档 |
-| 系统 | ① PostgreSQL（行存，有索引）② PostgreSQL（按日分区 + 索引）③ ClickHouse（MergeTree，按日分区，`ORDER BY (feed, route, ts)`）④ Spark + Iceberg（Parquet，按日分区） |
-| 工作负载 | W1 批量写入；W2 到站推断（重型转换）；W3 看板查询：按路线和小时聚合准点率；W4 点查询：某辆车某天的轨迹；W5 去重和更新（upsert）；W6（可选）大表 JOIN：客流 × 到站事件 |
+| 系统 | ① PostgreSQL（行存，有索引）② ClickHouse（MergeTree，按日分区，`ORDER BY (feed, route, ts)`）③ Spark + Iceberg（Parquet，按日分区）。原设计中的"PostgreSQL 按日分区"配置于 2026-10-23 删去 |
+| 工作负载（W = Workload） | W1 批量写入；W2 到站推断（重型转换）；W3 看板查询：按路线和小时聚合准点率；W4 点查询：某辆车某天的轨迹；W5 去重和更新（upsert）。原设计中的 W6（大表 JOIN）于 2026-10-23 删去 |
 | 测量 | 耗时（重复 5 次取中位数，冷缓存和热缓存分别报告）、压缩后的存储大小、CPU 和内存峰值 |
 | 公平性控制 | 同一台电脑；只启动 `bench` profile 和被测系统；各容器使用相同的 CPU 与内存上限；所有系统读取同一个 Iceberg 快照导出的数据 |
 | 解释 | 用 Postgres 的 `EXPLAIN ANALYZE`、ClickHouse 的 `EXPLAIN` 和 `system.query_log`、Spark UI，解释差异来源：行存与列存、压缩、分区裁剪、向量化执行、shuffle |
@@ -1475,6 +1488,21 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | O4 | Gold 层 dbt 测试结果、看板截图、查询 P95 |
 | O5 | RQ3 结果 |
 | O6 | RQ4 结果 |
+| O7（stretch） | RQ5 结果；或未完成的原因与已完成部分（写入 Future Work） |
+
+### 14.9 RQ5（stretch）：数据层设计对 LLM agent 的影响
+
+**定位**：计划做、不保证完成。只有在 RQ1–RQ4 的进度不受影响时才开始（最早在 FYP 2 期间，Gold 完成之后）。
+
+| 维度 | 设计 |
+|---|---|
+| 系统 | MCP server 提供 5 类工具：列出指标与定义；表结构与字段说明（读 dbt `manifest.json`/`catalog.json`）；只读查询（ClickHouse 只读账号，限制执行时间和返回行数）；数据质量与新鲜度（`fct_dq_result`、`fct_feed_health`）；已知数据问题（把 E 清单整理成机器可读的说明） |
+| 题库 | 50 道题，每题都有人工写好的标准 SQL 与答案。覆盖：指标查询（"昨天 17:00–19:00 T117 的平均班距"）、排名（"上周准点率最低的 3 条路线"）、数据坑（E01 路线 ID、V05 班次序号、深夜空 feed 不等于故障） |
+| 条件 | ① 只给 Silver 表结构；② 加上字段说明和已知数据问题；③ 再加上 Gold 预计算指标 |
+| 模型 | 本地 Ollama 7–8B 4-bit 量化模型为主（零成本）；可选一个免费额度的 API 模型作对照，检验结论是否只对小模型成立 |
+| 测量 | 答对率（结果与标准答案一致）、幻觉率（编造表名、字段或数字）、平均重试次数、耗时；每个条件重复 3 次 |
+| 假设 H5 | 条件 ③ 的答对率显著高于条件 ①，幻觉率显著降低；主要错误来自已编目的数据问题 |
+| 在报告中怎么写 | Proposal 与 FYP 1：写成 stretch objective（O7），明确说明是否完成取决于进度、不影响核心目标；FYP 2：完成则写结果与讨论，未完成则在 Future Work 中写设计和已完成部分 |
 
 ---
 
@@ -1579,4 +1607,5 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
+| v0.4 修订 | 2026-10-23 | RQ3 只做 Spark Structured Streaming（方案 B 移到 Future Work）；RQ4 改为 3 种系统、W1–W5；RQ1 增加留出验证、物理合理性检查和实地观测的安排；新增 stretch 目标 O7/RQ5（MCP + 本地 LLM）与 N7、§14.9；标题不变；记录 Azure for Students 不可行、演示方案待定 |
 | v0.4 | 2026-10-20 | 合并 v0.2 与 v0.3；重新设计采集层（三档 VM 方案）；按 my-context 与 UTAR 校历重排路线图；新增与三份报告的映射、评估与实验设计、合并说明 |

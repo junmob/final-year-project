@@ -8,7 +8,7 @@
 - Each phase follows its own guideline; `docs/context/fyp-index.md` is an index only. Submission dates: `docs/context/academic-calendar.md`.
 
 ## Project Baseline
-- Current design baseline: `docs/fyp-design/fyp_project_design_v0.4.md` (v0.2/v0.3 are archived in `docs/fyp-design/archive/`).
+- Current design baseline: `docs/fyp-design/fyp_project_design_v0.4.md` (v0.2/v0.3 are archived in `docs/fyp-design/archive/`). Plain-language RQ explanations: `docs/fyp-design/rq-explained.md`.
 - Data source facts and evidence: `docs/data-source/data-source-summary.md`.
 
 ## Language Rules (school-facing material)
