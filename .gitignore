@@ -1,6 +1,8 @@
-# 长期采集的实时数据（Bronze）体积大，不进版本库；Static ZIP 与 manifest.json 需要提交（GitHub Actions 备份）
-# docs/evidence/ 下的一次性实测证据（.pb / .csv）需要提交，不要忽略
+# Long-term Bronze data is too large for git; it lives on the collector VM and later in local MinIO.
+# The GitHub Actions archives under data/raw/gtfs_static and data/raw/weather_* ARE committed,
+# and so is the one-off probe evidence under docs/evidence/ (.pb / .csv); do not ignore those.
 data/raw/gtfs_realtime/
+data/bronze/
 # python
 __pycache__/
 *.pyc
