@@ -74,7 +74,7 @@ def main() -> None:
 
         static = latest_static_file(category, "trips.txt")
         if static is None:
-            print(f"No Static snapshot for {category}; run scripts/download_gtfs_static.py first")
+            print(f"No Static snapshot for {category}; run ingestion/download_gtfs_static.py first")
             continue
         trips, checked_at = static
         print(f"Static snapshot used: {checked_at}")

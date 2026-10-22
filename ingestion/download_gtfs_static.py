@@ -9,9 +9,10 @@
 #     every repack.
 #   - Storing a full ZIP per change would add hundreds of MB per year to the repository.
 #
-# Layout (per category):
-#   data/raw/gtfs_static/<category>/blobs/<sha256[:2]>/<sha256>.gz   file contents, stored once
-#   data/raw/gtfs_static/<category>/snapshots.jsonl                  one line per daily check
+# Layout (per category; <BRONZE_DIR> defaults to data/raw for the GitHub Actions backup and is
+# set to the Bronze directory on the collector VM):
+#   <BRONZE_DIR>/gtfs_static/<category>/blobs/<sha256[:2]>/<sha256>.gz   file contents, stored once
+#   <BRONZE_DIR>/gtfs_static/<category>/snapshots.jsonl                  one line per daily check
 # Each snapshot records the hash of every file in the ZIP, so the exact contents of any
 # day's feed can be reconstructed. The ZIP container itself (timestamps, compression) is
 # not kept byte-for-byte; only file contents are.
@@ -19,6 +20,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 import sys
 import time
 import zipfile
@@ -28,10 +30,11 @@ from pathlib import Path
 import requests
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = ROOT / "data" / "raw" / "gtfs_static"
-URL = "https://api.data.gov.my/gtfs-static/prasarana?category="
+OUT_DIR = Path(os.environ.get("BRONZE_DIR", ROOT / "data" / "raw")) / "gtfs_static"
+URL = "https://api.data.gov.my/gtfs-static/prasarana/?category="  # trailing slash avoids a 301
 CATEGORIES = ["rapid-bus-kl", "rapid-bus-mrtfeeder", "rapid-rail-kl"]
 REQUEST_GAP_SECONDS = 20  # data-source summary §7.1: at least 20 s between requests
+RETRIES, RETRY_WAIT_SECONDS = 3, 60  # Static has its own rate-limit quota, so retrying is safe
 JUNK_PREFIXES = ("__MACOSX/",)
 MYT = timezone(timedelta(hours=8))
 
@@ -95,6 +98,21 @@ def ingest_zip(category: str, zip_bytes: bytes, checked_at: datetime, source: st
     return record
 
 
+def get_with_retry(url: str) -> requests.Response:
+    for attempt in range(1, RETRIES + 1):
+        try:
+            resp = requests.get(url, timeout=60)
+            resp.raise_for_status()
+            zipfile.ZipFile(io.BytesIO(resp.content)).testzip()  # reject truncated downloads
+            return resp
+        except (requests.RequestException, zipfile.BadZipFile) as e:
+            if attempt == RETRIES:
+                raise
+            print(f"[retry] {url}: {e}; waiting {RETRY_WAIT_SECONDS} s", flush=True)
+            time.sleep(RETRY_WAIT_SECONDS)
+    raise AssertionError("unreachable")
+
+
 def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     failed = False
@@ -104,8 +122,7 @@ def main() -> int:
             time.sleep(REQUEST_GAP_SECONDS)
         checked_at = datetime.now(MYT)
         try:
-            resp = requests.get(URL + category, timeout=60)
-            resp.raise_for_status()
+            resp = get_with_retry(URL + category)
             record = ingest_zip(category, resp.content, checked_at, source="api")
         except (requests.RequestException, zipfile.BadZipFile) as e:
             print(f"[failed] {category}: {e}")

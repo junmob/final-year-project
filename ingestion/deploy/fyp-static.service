@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily GTFS Static check with per-file deduplication
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/fyp
+ExecStart=/home/ubuntu/fyp/.venv/bin/python ingestion/download_gtfs_static.py
+Environment=PYTHONUNBUFFERED=1
+Environment=BRONZE_DIR=/home/ubuntu/fyp-data/bronze
+TimeoutStartSec=15min
+Nice=5

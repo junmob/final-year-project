@@ -13,7 +13,7 @@
 > 4. [`Job_Market.md`](../career/Job_Market.md)：工具选型约束（15 家公司 JD）
 > 5. [`fyp_project_design_v0.2.md`](archive/fyp_project_design_v0.2.md)：业务、指标、数据质量规则、论文结构的原文基础
 > 6. `docs/context/{proposal,fyp1,fyp2}/` 的 guidelines 与 template，[`docs/context/fyp-index.md`](../context/fyp-index.md)，[`docs/context/academic-calendar.md`](../context/academic-calendar.md)（UTAR 2027–2028 校历）
-> 7. 已有原型：[`ingestion/collect_gtfs_rt.py`](../../ingestion/collect_gtfs_rt.py)、[`scripts/download_gtfs_static.py`](../../scripts/download_gtfs_static.py)、[`.github/workflows/`](../../.github/workflows/)（只作可行性证据，不是约束）
+> 7. 已有原型：[`ingestion/collect_gtfs_rt.py`](../../ingestion/collect_gtfs_rt.py)、[`ingestion/download_gtfs_static.py`](../../ingestion/download_gtfs_static.py)、[`.github/workflows/`](../../.github/workflows/)（只作可行性证据，不是约束）
 >
 > **状态标记**：✅ 已确认或已完成 ｜ 🟡 部分完成 ｜ ⏳ 待 V06/V07 实测校准 ｜ ❓ 待确认（汇总在 §15）
 >
@@ -69,8 +69,9 @@
 | 公共假期（dbt seed 人工维护，MVP 起加入 `dim_date`） | KTMB、BAS.MY 各城市、Penang、Kuantan（E10、E11；BAS.MY Ipoh 可作为"多运营商标准化"的可选扩展） |
 | **Rapid Rail OD 每日客流**（次核心；FYP 1 中后段一次性回填 2023 年起的历史，之后每天增量） | 实际观测天气（如 Open-Meteo，FYP 2 可选，需先验证条款） |
 | 天气警告（**只归档**，不分析） | 天气警告和洪水警告的分析（Future Work） |
-| 行政区人口（**可选**，取决于县界数据 V11 是否可得） | 云数仓与托管服务（Snowflake、Databricks、Fabric、AWS 等，违反零成本原则，见 §13） |
-| | 自然语言转 SQL 等 LLM 功能（Future Work） |
+| | 行政区人口（2026-10-23 移出范围：只能提供背景属性，对研究问题帮助有限） |
+| | 云数仓与托管服务（Snowflake、Databricks、Fabric、AWS 等，违反零成本原则，见 §13） |
+| | 通用的自然语言转 SQL 产品（只做 stretch 目标 O7 的 agent 访问层评估，见 §14.9） |
 
 各数据源的采用方式、粒度和清洗规则以 summary §9 为准，本文 §6 和 §8 给出对应的质量规则与采集落地方式。
 
@@ -152,7 +153,7 @@
 | 目标 | 内容 | 可度量的完成标准 |
 |---|---|---|
 | **O1** 采集与归档 | 建立 24 小时不间断的采集与归档，包括两个 Realtime feed、每天的 Static 版本检查和天气预报 | 每个 feed 每天可用率 ≥ 95%；Bronze 每日对账零丢失；Static 每个新版本都被捕获 |
-| **O2** 数据质量框架 | 对问题数据进行检测、隔离和量化 | DQ01–DQ29 全部实现为自动化测试或作业内检查；每条规则有每日违规统计；quarantine 可回放 |
+| **O2** 数据质量框架 | 对问题数据进行检测、隔离和量化 | DQ01–DQ28 全部实现为自动化测试或作业内检查（DQ29 已停用）；每条规则有每日违规统计；quarantine 可回放 |
 | **O3** 到站推断与指标 | 从 GPS 点推断到站事件，计算准点率、发车间隔、额外等待时间、串车等指标 | mrtfeeder 全部路线产出每日和每小时 OTP；rapid-bus-kl 高频路线产出 EWT 与串车率；到站推断覆盖率与精度（RQ1）有实测数字 |
 | **O4** 数据仓库与看板 | 用 Kimball 星型模型构建服务层，并提供可视化看板 | Gold 层 5 张以上事实表通过 dbt 测试；看板 7 个页面可用；P95 查询时间达到 NFR5 |
 | **O5** 流批对比 | 评估批处理与流处理在延迟、准确性和复杂度上的差异 | 实现一种流处理方案（Kafka → Spark Structured Streaming → ClickHouse），与批处理结果比较，量化延迟、差异率、资源与复杂度 |
@@ -189,7 +190,7 @@
 
 | 维度 | 体现 |
 |---|---|
-| 数据 | 两个 30 秒级实时 feed，6 个月约 1 亿行（⏳ 待 V07 校准）；3 个运营商的 Static，schema 各不相同；另有 5 个辅助数据源（天气预报、天气警告、假期、轨道客流、人口） |
+| 数据 | 两个 30 秒级实时 feed，6 个月约 1 亿行（⏳ 待 V07 校准）；3 个运营商的 Static，schema 各不相同；另有 4 个辅助数据源（天气预报、天气警告、假期、轨道客流） |
 | 算法 | 稀疏 GPS 到站推断、线性参照投影与插值、发车间隔与 EWT、SCD2 as-of join、跨午夜服务日期推断 |
 | 架构 | 约 11 个组件（Kafka、MinIO、Iceberg、Polaris、Spark、ClickHouse、dbt、Airflow、PostgreSQL、Metabase、Prometheus/Grafana），批流两条链路，湖仓与 OLAP 两层，云端与本地两个节点 |
 | 质量 | 29 条数据质量规则、quarantine、每日对账、SLO |
@@ -383,7 +384,7 @@ $$
 | DQ26 | 客流 | `(date, origin, destination)` 唯一；`ridership ≥ 0`；最新日期不早于"今天 − 2 天" | 唯一性、有效性、时效性 | 🔴 / 📊 | summary E39 |
 | DQ27 | 客流 | 站点代码能关联到 rapid-rail-kl 的站点（覆盖率 ≥ 95%，未匹配的列出） | 一致性 | 📊 | summary E37 |
 | DQ28 | 公共假期 | `(holiday_date, state_code)` 唯一；seed 覆盖到"今天 + 90 天" | 唯一性、完整性 | 📊（失败时提醒更新） | summary E41 |
-| DQ29 | 人口 | 只保留 `sex = both`、`age = overall`、`ethnicity = overall`；转换为人数后为正数 | 一致性、有效性 | 🔧 | summary E40 |
+| DQ29 | （停用） | 行政区人口于 2026-10-23 移出范围，编号保留、不再使用 | — | — | — |
 
 ### 脏点 → 规则对照表（summary E01–E44）
 
@@ -427,7 +428,7 @@ $$
 | E37 | 站点字段是"代码: 名称" | 🔧 拆分 | DQ27 |
 | E38 | `date` 列实际是日期时间字符串 | 🔧 转为日期 | Silver 转换 |
 | E39 | 客流文件按年份命名、每天整份覆盖 | 🔧 文件名动态生成；哈希识别更新；MERGE | DQ26 |
-| E40 | 人口表混合多个切片、单位千人 | 🔧 只取 overall，乘以 1000 | DQ29 |
+| E40 | （停用：行政区人口已移出范围） | — | — |
 | E41 | 公共假期没有官方 API | 🔧 dbt seed 人工维护 | DQ28 |
 | E42 | 天气预报实际取值与文档枚举不一致 | 🔧 规范化 + 映射表收录同义写法；新值📊 | DQ22 |
 | E43 | ZIP 内混入 `__MACOSX/` 打包文件 | 🔧 Bronze 标记为 junk，Silver 忽略 | D3 |
@@ -498,7 +499,7 @@ Kafka 里的数据从哪里来，取决于最终拿到的 VM 规格：A 档 VM �
 ```mermaid
 flowchart LR
     API["api.data.gov.my<br/>GTFS-RT 每30秒<br/>Static 每天 天气 每3小时"]
-    FILES["storage.data.gov.my<br/>轨道客流 Parquet<br/>DOSM 人口"]
+    FILES["storage.data.gov.my<br/>轨道客流 Parquet"]
 
     subgraph CLOUD["云端采集节点 免费VM 24小时"]
         COL["采集服务<br/>Python systemd"]
@@ -527,7 +528,7 @@ flowchart LR
     end
 
     PACK -->|"SSH 或 S3 拉取"| SYNC --> BR
-    FILES --> BR
+    FILES --> COL
     BR --> SPB --> ICE
     CAT -.-> ICE
     ICE --> DBT --> CH
@@ -577,7 +578,18 @@ flowchart LR
 | **健康与指标** | 健康日志 `.jsonl`（每次请求一行）；通过 `prometheus_client` 暴露 `/metrics`（采集成功率、最近成功时间、磁盘使用率） | 常驻 | — |
 | **发布器**（仅 A 档） | 读取新落盘的文件，解析后发布到 Kafka；用检查点文件记录已发布到哪个文件；Kafka 不可用时只是暂停发布，不影响采集 | 常驻 | — |
 
-客流 Parquet 和人口文件**不放在云端**：客流文件每天整份覆盖、包含全年历史（summary §6.4.3），本地开机时下载不会丢数据（最多丢失中间的修订历史，见 §15）；人口每年更新一次。两者由本地 Airflow 直接写入本地 Bronze。
+**客流 Parquet 也由云端归档**（2026-10-23 改）：客流文件每天整份覆盖、包含全年历史，而且旧年份的文件也会被修订（2025 年的文件在 2026-04-02 仍有更新，summary §6.4.1）。只在本地开机时下载会丢掉中间的修订版本，而文件只有约 5 MB，所以由 VM 每 3 小时用 HEAD 比较 ETag，变化时才下载，并保留每一个不同的版本。行政区人口已移出范围。
+
+**实现方式**（2026-10-23）：RT 轮询是常驻进程；其余模块各是一个 systemd timer 触发的一次性脚本（`ingestion/deploy/fyp-*.timer`），互相独立，任何一个出错都不会影响 RT 采集。
+
+| 模块 | 脚本 | 时间（MYT） |
+|---|---|---|
+| RT 轮询 | `ingestion/collect_gtfs_rt.py`（常驻） | 每 15 秒 |
+| 每日打包 | `ingestion/pack_gtfs_rt.py` | 00:30 |
+| Static 检查 | `ingestion/download_gtfs_static.py` | 04:17（GitHub Actions 同时运行，作为异地备份） |
+| 天气预报 | `ingestion/download_weather.py --only weather_forecast` | 每 3 小时的 :05 |
+| 天气警告 | `ingestion/download_weather.py --only weather_warning` | 每小时的 :35 |
+| 客流 | `ingestion/download_ridership.py` | 每 3 小时的 :50 |
 
 **Bronze 目录结构**（云端落盘与本地 MinIO 使用同一套路径；`date` 和 `hour` 为马来西亚时间，文件名为 UTC 时间槽，与现有原型一致）：
 
@@ -585,11 +597,11 @@ flowchart LR
 bronze/
 ├── gtfs_rt/feed=rapid-bus-mrtfeeder/date=2026-11-01/hour=08/20261101T003000Z.pb
 ├── gtfs_rt/_packs/feed=rapid-bus-mrtfeeder/date=2026-11-01/rt.tar.zst   (+ manifest.json)
-├── gtfs_static/feed=rapid-bus-mrtfeeder/date=2026-11-14/gtfs.zip        (+ gtfs.zip.sha256)
-├── weather_forecast/date=2026-11-01/fetched_at=070000.json
-├── weather_warning/date=2026-11-01/hour=08.json
-├── ridership_rapidrail/year=2026/downloaded=2026-11-01/rapidrail_2026_daily.parquet (+ .sha256，本地写入)
-├── population_district/downloaded=2026-11-01/population_district.parquet            （本地写入）
+├── gtfs_static/rapid-bus-mrtfeeder/blobs/<sha256[:2]>/<sha256>.gz     （每个文件内容只存一次）
+├── gtfs_static/rapid-bus-mrtfeeder/snapshots.jsonl                    （每天一行：各文件的哈希、哪些文件变了）
+├── weather_forecast/date=2026-11-01/fetched_at=070500.json.gz          （+ manifest.json、fetch_log.jsonl）
+├── weather_warning/date=2026-11-01/fetched_at=083500.json.gz           （同上）
+├── ridership_rapidrail/year=2026/downloaded=2026-11-01/fetched_at=015000.parquet（+ year=2026/versions.jsonl）
 └── _health/feed_health_2026-11-01.jsonl
 ```
 
@@ -642,7 +654,7 @@ bronze/
 
 #### 8.3.7 与现有原型的关系
 
-[`ingestion/collect_gtfs_rt.py`](../../ingestion/collect_gtfs_rt.py) 已经实现了 RT 轮询的核心：15 秒时间槽、两个 feed 错开、失败不重试、原子写入、sha256、`.jsonl` 健康日志，以及 systemd 服务文件。这些全部沿用，是 FYP 1 Ch4 的可行性证据。[`scripts/download_gtfs_static.py`](../../scripts/download_gtfs_static.py) 的内容指纹逻辑也沿用到 Static 检查模块。需要随本设计演进的部分（输出路径改为 `bronze/gtfs_rt/...`，新增 Static、天气、打包、manifest、`/metrics`、发布器模块；GitHub Actions 每周 Static 备份改为异地备份）列在 §15，本次不修改代码。
+[`ingestion/collect_gtfs_rt.py`](../../ingestion/collect_gtfs_rt.py) 已经实现了 RT 轮询的核心：15 秒时间槽、两个 feed 错开、失败不重试、原子写入、sha256、`.jsonl` 健康日志，以及 systemd 服务文件。这些全部沿用，是 FYP 1 Ch4 的可行性证据。[`ingestion/download_gtfs_static.py`](../../ingestion/download_gtfs_static.py) 的内容指纹逻辑也沿用到 Static 检查模块。需要随本设计演进的部分（输出路径改为 `bronze/gtfs_rt/...`，新增 Static、天气、打包、manifest、`/metrics`、发布器模块；GitHub Actions 每周 Static 备份改为异地备份）列在 §15，本次不修改代码。
 
 ### 8.4 分层
 
@@ -708,7 +720,7 @@ erDiagram
 | `dim_vehicle` | 标准化后的车辆 ID（DQ12）、车牌加盐哈希（原值只在受限视图中可见）、首次和最后出现时间 |
 | `dim_feed` | 运营商、排班模式（班次型或间隔型） |
 | `dim_weather_daily` | 地点 × 日期；早、午、晚三个时段的预报类别和严重程度；取当天早上采集的提前 0 天预报 |
-| `dim_location` | **统一的物理地点**：巴士站与轨道站通过"名称模糊匹配 + 坐标距离"对齐（实体对齐，§13）；所属州和县；人口（可选） |
+| `dim_location` | **统一的物理地点**：巴士站与轨道站通过"名称模糊匹配 + 坐标距离"对齐（实体对齐，§13）；所属州和县 |
 | `bridge_route_rail_station` | 接驳路线 ↔ 它服务的 MRT 站（由 `trip_headsign` 和终点站坐标匹配得到） |
 
 **ClickHouse 物理设计**：事实表使用 MergeTree，按日期分区，`ORDER BY (feed, route, ts)` 一类的排序键；dbt 增量模型按分区更新。**治理**：ClickHouse 角色 `engineer` 可以读取全部 Gold 表和受限视图，`analyst` 只能读取 Gold 中不含车牌原值的表；车牌在 dbt 中以加盐哈希输出，盐值放在环境变量中（§13）。
@@ -897,10 +909,10 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | **Must**（不能砍） | 24/7 采集与 Bronze 对账；Spark → Iceberg 的 Raw 与 Silver；Static SCD2；DQ01–DQ21 中的核心规则与 quarantine；到站推断（半径法 + 线性参照）；mrtfeeder OTP 与 rapid-bus-kl EWT、串车；ClickHouse + dbt 的 Gold 星型模型；Airflow 全流程；Metabase 看板 ①②③⑥；幂等与对账；SLO 与切换演练；实体对齐；RQ1、RQ2、RQ4 |
 | **Should** | 流处理方案 A（Spark Structured Streaming）与 RQ3；天气（州级）与看板 ⑤；Rapid Rail OD 客流与看板 ⑦；RBAC 与车牌脱敏；CI；Prometheus + Grafana |
 | **Should（stretch）** | Agent 访问层（MCP server）与 RQ5：计划做，不保证完成；放在 FYP 2，Gold 完成之后 |
-| **Could** | 县级天气与行政区人口（取决于 V11）；天气警告的事件标记；实际观测天气（Open-Meteo）；A 档 VM 上 24 小时在线 demo |
+| **Could** | 县级天气（取决于 V11）；天气警告的事件标记；实际观测天气（Open-Meteo）；A 档 VM 上 24 小时在线 demo |
 | **Won't**（本项目不做） | 机器学习到站预测；流处理方案 B（ClickHouse Kafka 引擎）；RQ4 的"PostgreSQL 按日分区"配置与 W6 大表 JOIN；云数仓移植；其他州的 BAS.MY |
 
-**时间不够时的砍需求顺序**：县级天气与人口 → 天气警告 → 实际观测天气 → RQ5 缩为 2 种条件 → Prometheus/Grafana（管道健康退回 Metabase 页面 ⑥）→ RQ5 整体转入 Future Work → RQ3 只测延迟。**不要砍**：数据质量、SLA、实体对齐、幂等加载、RQ4。这些是 junior 岗位最看重的，也是学生项目最缺的。
+**时间不够时的砍需求顺序**：县级天气 → 天气警告 → 实际观测天气 → RQ5 缩为 2 种条件 → Prometheus/Grafana（管道健康退回 Metabase 页面 ⑥）→ RQ5 整体转入 Future Work → RQ3 只测延迟。**不要砍**：数据质量、SLA、实体对齐、幂等加载、RQ4。这些是 junior 岗位最看重的，也是学生项目最缺的。
 
 ### 10.3 路线图（2026-10 → 2027-09）
 
@@ -926,7 +938,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | Spark + Iceberg + ClickHouse + dbt + Airflow + Metabase 全链路跑通 | RQ2 的逐条规则消融实验 |
 | 两种排班模式的指标（OTP、EWT、串车）都能在看板上查看 | RQ3 的完整流批对比 |
 | 至少一种流处理方案可演示 | RQ4 的"全部数据"档与执行计划深入分析 |
-| 数据质量框架、对账、SLO、至少一次切换演练 | 县级天气、人口、实际观测天气等 Could 项目 |
+| 数据质量框架、对账、SLO、至少一次切换演练 | 县级天气、实际观测天气等 Could 项目 |
 | RQ4 初步数字（1 周、1 个月两档） | FYP 2 报告、海报、答辩 |
 | README（英文）、架构图、demo 视频、简历中的真实数字 | |
 
@@ -1269,7 +1281,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | V05、V14 | P1 前 | trip_id 序号、`problematic_trips.csv` |
 | V08 速度单位 | P0 后一天 | DQ06 |
 | V09 客流历史文件 | P3 前 | 2023–2025 年文件、站点代码、对账 |
-| V10、V11 人口与县界 | P3 前 | 决定 Could 项目是否采用 |
+| V11 县界 | P3 前 | 决定县级天气是否采用（V10 随人口移出范围而取消） |
 | V12 2027 年假期列表 | P2 前 | DQ28 |
 | V13 trip updates 是否推出 | 每月 | 影响 RQ1 |
 | 确认学校日期 | 2026-12 前 | IIPSPW 官方截止日（推算为 Sem 1 Week 8 星期五 17:00）；FYP 1、FYP 2 presentation 的日期与形式 |
@@ -1552,7 +1564,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 |---|---|---|---|
 | 1 | `ingestion/collect_gtfs_rt.py` | ✅ 2026-10-22 已改：英文、输出 `bronze/gtfs_rt/...`、轻量 Protobuf 校验分类（`ok`/`ok_empty`/`parse_error` 等，无法解析的存 `_invalid/`）、健康记录带 `instance`；新增 `pack_gtfs_rt.py` 每日打包 + manifest；已部署到 AWS EC2（悉尼）。还缺 Static、天气、`/metrics`、发布器。原问题：输出根目录是 `data/raw/gtfs_realtime/feed=...`，本设计为 `bronze/gtfs_rt/feed=...`；只采集 RT，没有 Static、天气、每日打包、manifest、`/metrics`、发布器；健康记录没有 `ok_empty`、`parse_error` 等状态分类 | P0 时按 §8.3.3 扩展；状态分类可以在采集端只做轻量的 Protobuf 校验 |
 | 2 | `ingestion/deploy/gtfs-rt-collector.service` | ✅ 2026-10-22 已按 VM 实际路径修改，另加 `gtfs-rt-pack.service/.timer` 与 `install.sh`。原问题：用户名和路径是占位值 | 部署到 VM 时按实际修改，另外开启 NTP |
-| 3 | `scripts/download_gtfs_static.py` | 输出为平铺的 `data/raw/gtfs_static/<category>_<YYYYMMDD>.zip` + `manifest.json`，本设计为 `bronze/gtfs_static/feed=/date=/gtfs.zip` + `.sha256`；日期取运行环境的本地日期（GitHub runner 为 UTC），没有重试 | 并入采集服务的 Static 模块时统一路径、显式使用马来西亚时间；`bronze_sync` 负责把已有存档映射到新路径 |
+| 3 | `ingestion/download_gtfs_static.py`（原 `scripts/`） | ✅ 2026-10-23：已移到 `ingestion/`，输出根目录可配置（VM 上为 `bronze/gtfs_static/`），使用马来西亚时间，失败重试 3 次，并在 VM 上每天运行；Bronze 结构采用按文件去重（blobs + snapshots），不再是整包 `gtfs.zip`。原问题：输出为平铺的 `data/raw/gtfs_static/<category>_<YYYYMMDD>.zip` + `manifest.json`，本设计为 `bronze/gtfs_static/feed=/date=/gtfs.zip` + `.sha256`；日期取运行环境的本地日期（GitHub runner 为 UTC），没有重试 | 并入采集服务的 Static 模块时统一路径、显式使用马来西亚时间；`bronze_sync` 负责把已有存档映射到新路径 |
 | 4 | `.github/workflows/backup_gtfs.yml` | ✅ 2026-10-21 已改为每天 04:17 MYT 检查；`download_gtfs_static.py` 改为按文件、按内容哈希去重（`<category>/blobs/` + `snapshots.jsonl`），旧的平铺 ZIP 已导入为快照 | ✅ 2026-10-22 已删除旧 ZIP 和 `manifest.json`；`check_realtime.py` 改为读取快照 |
 | 5 | `.github/workflows/realtime_probe.yml` | 一次性实测，但 cron 每年同一天都会触发 | ✅ 2026-10-22 已删除 |
 | 6 | summary §7.3 部署分工 | ① 客流文件下载放在云端 VM，本设计改为本地 Airflow（客流文件整份覆盖、含全年历史，代价是本地关机期间可能错过中间的修订版本）；② "演示时在本地临时启动一个采集实例直接写 Kafka"会让 RT 请求翻倍，本设计改为中继和回放；③ "同步后清理 VM 旧文件"改为"磁盘允许时保留完整副本，校验通过后才清理"；④ A 档在云端运行 MinIO 和 Kafka，与"云端不运行 Kafka"不同 | ✅ 2026-10-20 已在 summary §7.3 加注：以本设计 §8.3 为准 |
@@ -1581,7 +1593,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 7 | Polaris 的部署复杂度是否可以接受 | 备选：iceberg-rest 参考实现 | P1 技术验证 |
 | 8 | "Snowflake Open Catalog 基于 Apache Polaris"这一说法 | 只用于面试准备，引用前核实官方说明 | 需要时 |
 | 9 | Oracle 与 GCP 免费额度的具体条款（空闲回收、出站流量、磁盘） | 按 §8.3.4 的风险提示处理 | 拿到 VM 前后 |
-| 10 | 天气预报的临时归档（P0 上线前） | ✅ 2026-10-20 已上线 `weather_archive.yml` + `scripts/download_weather.py`（每 3 小时，内容变化才保存） | 已完成 |
+| 10 | 天气预报的临时归档（P0 上线前） | ✅ 2026-10-20 已上线 `weather_archive.yml`；✅ 2026-10-23 由 VM 接管（`ingestion/download_weather.py`，预报每 3 小时、警告每小时），GitHub workflow 并行几天作交叉核对后删除 | 已完成 |
 | 11 | 设计中的经验阈值：DQ21 的"深夜 < 10 辆不参与比较"、线性参照的"后退 < 30 米按前值处理"、准点窗口 −60 至 +300 秒等 | 作为初始值，P2–P3 用真实数据校准 | P2–P3 |
 | 12 | V02 的计数主体（按 IP 还是按 endpoint） | 不影响设计（始终只运行一个采集实例），只做 429 监控 | 出现异常 429 时 |
 | 13 | 试点路线的具体选择 | 按 §10.1 标准，在积累 14 天数据后选定 | P2 前 |
@@ -1607,5 +1619,5 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
-| v0.4 修订 | 2026-10-23 | RQ3 只做 Spark Structured Streaming（方案 B 移到 Future Work）；RQ4 改为 3 种系统、W1–W5；RQ1 增加留出验证、物理合理性检查和实地观测的安排；新增 stretch 目标 O7/RQ5（MCP + 本地 LLM）与 N7、§14.9；标题不变；记录 Azure for Students 不可行、演示方案待定 |
+| v0.4 修订 | 2026-10-23 | 采集：Static、天气、客流由 VM 上的 systemd timer 采集，客流改为云端归档每个版本；行政区人口移出范围（DQ29、E40 停用）。范围：RQ3 只做 Spark Structured Streaming（方案 B 移到 Future Work）；RQ4 改为 3 种系统、W1–W5；RQ1 增加留出验证、物理合理性检查和实地观测的安排；新增 stretch 目标 O7/RQ5（MCP + 本地 LLM）与 N7、§14.9；标题不变；记录 Azure for Students 不可行、演示方案待定 |
 | v0.4 | 2026-10-20 | 合并 v0.2 与 v0.3；重新设计采集层（三档 VM 方案）；按 my-context 与 UTAR 校历重排路线图；新增与三份报告的映射、评估与实验设计、合并说明 |

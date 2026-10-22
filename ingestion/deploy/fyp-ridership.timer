@@ -1,0 +1,10 @@
+[Unit]
+Description=Schedule for fyp-ridership (Malaysia time)
+
+[Timer]
+OnCalendar=*-*-* 01/3:50:00 Asia/Kuala_Lumpur
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

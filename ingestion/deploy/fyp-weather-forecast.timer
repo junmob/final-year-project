@@ -1,0 +1,10 @@
+[Unit]
+Description=Schedule for fyp-weather-forecast (Malaysia time)
+
+[Timer]
+OnCalendar=*-*-* 00/3:05:00 Asia/Kuala_Lumpur
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

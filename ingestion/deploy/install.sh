@@ -22,9 +22,8 @@ python3 -m venv "$APP/.venv"
 "$APP/.venv/bin/pip" install -q -r "$APP/ingestion/requirements.txt"
 mkdir -p "$DATA"
 
-sudo cp "$APP"/ingestion/deploy/gtfs-rt-collector.service \
-        "$APP"/ingestion/deploy/gtfs-rt-pack.service \
-        "$APP"/ingestion/deploy/gtfs-rt-pack.timer /etc/systemd/system/
+sudo cp "$APP"/ingestion/deploy/*.service "$APP"/ingestion/deploy/*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now gtfs-rt-collector.service gtfs-rt-pack.timer
+sudo systemctl enable --now gtfs-rt-collector.service gtfs-rt-pack.timer \
+  fyp-static.timer fyp-weather-forecast.timer fyp-weather-warning.timer fyp-ridership.timer
 systemctl --no-pager status gtfs-rt-collector.service | head -n 5

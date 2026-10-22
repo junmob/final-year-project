@@ -1,11 +1,11 @@
 name: Daily GTFS Static Check
 
 # Checks the 3 core GTFS Static feeds once a day and stores changed files only
-# (per-file, content-addressed deduplication; see scripts/download_gtfs_static.py).
+# (per-file, content-addressed deduplication; see ingestion/download_gtfs_static.py).
 # 04:17 MYT = 20:17 UTC. The official recommendation is a daily refresh at 04:00;
 # an off-the-hour minute is used because GitHub delays scheduled runs at :00.
-# Once the cloud collector takes over the daily check, keep this workflow as an
-# off-site backup or reduce it to weekly.
+# Since 2026-10-23 the collector VM runs the same check (fyp-static.timer); this
+# workflow is kept as an independent off-site backup.
 on:
   schedule:
     - cron: '17 20 * * *'
@@ -30,7 +30,7 @@ jobs:
         run: pip install requests
 
       - name: Check GTFS Static (store changed files only)
-        run: python scripts/download_gtfs_static.py
+        run: python ingestion/download_gtfs_static.py
 
       - name: Commit and push
         run: |

@@ -45,7 +45,7 @@
 | S7 | 天气警告 | MET Malaysia，经 data.gov.my | OpenAPI | 按需 | JSON | 事件 | 🟡 **只归档**，分析放到 Future Work |
 | S8 | 公共假期 | 政府公告（没有官方 API） | dbt seed（人工维护） | 每年 + 临时公告 | CSV | 日期维度 | ✅ **采用**（MVP） |
 | S9 | Rapid Rail OD 每日客流（巴生谷） | Prasarana，经 data.gov.my | 文件下载 | 每天 | Parquet / CSV | 次事实 | ✅ **采用（次核心）**，FYP 1 中后段 |
-| S10 | 行政区人口 | DOSM | 文件下载 | 每年 | Parquet / CSV | 地区维度属性 | 🟡 **可选**，取决于县界数据是否可得 |
+| S10 | 行政区人口 | DOSM | 文件下载 | 每年 | Parquet / CSV | 地区维度属性 | ❌ **2026-10-23 移出范围**（§6.5） |
 | S11 | 实际观测天气（例如 Open-Meteo） | 第三方 | API | 每小时 | JSON | 环境维度 | ❓ **待定**，FYP 2 可选 |
 | — | GTFS：KTMB、BAS.MY、Penang、Kuantan | 多家 | OpenAPI | | | | ❌ 不纳入（KTMB 和 BAS.MY 可作可选扩展） |
 | — | 洪水警告 `/flood-warning` | data.gov.my | OpenAPI | 实时 | JSON | | ❓ 未评估，Future Work 候选 |
@@ -501,6 +501,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 | **6 个月** | 约 **1 亿行**，原始数据约 **10 GB** | |
 
 - 白天高峰车辆可能更多，实际规模可能更大（V07）。
+- ✅ **实测（VM 首个完整日 2026-10-22，manifest）**：kl 20.6 MB、feeder 20.8 MB 原始数据（01:44 起约 22 小时），全天约 **45 MB**，比上面的估算略低；`tar.zst` 打包后 kl 2.9 MB（7.1 倍）、feeder 4.2 MB（5.0 倍），**每天约 7 MB**，一年约 2.6 GB。当天 VM 采集到的峰值车辆数：kl 135、feeder 190。
 - 去重后的有效行数会更少，因为同一个 GPS 点可能被连续多次采集到。
 - 同一次快照内，车辆时间戳跨度约 **83 到 84 秒**（例如 10/5 kl：19:52:35 到 19:53:59），说明部分车辆的位置更新间隔超过 30 秒，或者 feed 中保留了较旧的位置。
 
@@ -564,7 +565,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 | E37 | 站点字段是"代码: 名称"组合字符串 | 官方样本 `AG01: Sentul Timur` | 🔧 拆分成代码和名称 | DQ27 |
 | E38 | `date` 列实际是日期时间字符串 | 官方样本 `2026-10-13 00:00:00` | 🔧 转为日期 | — |
 | E39 | 客流文件按年份命名，并且每天整份覆盖 | 官方 URL `rapidrail_2026_daily.parquet` | 🔧 文件名按年份动态生成；增量识别 | DQ26 |
-| E40 | 人口表混合多个切片，单位是千人且为浮点数 | 官方样本与变量定义 | 🔧 只取 overall 切片，乘以 1000 | DQ29 |
+| E40 | （停用：行政区人口已移出范围，§6.5） | — | — | — |
 | E41 | 公共假期没有官方 API | 你的查证 | 🔧 dbt seed 人工维护 | DQ28 |
 | E42 | 天气预报的实际取值与文档枚举不一致 | 2026-10-20 实测：`Jerebu`（文档为 `Berjerebu`）、`Tiada Hujan`（文档为 `Tiada hujan`，大小写不同） | 🔧 规范化大小写和空格；映射表收录同义写法；新值📊 | DQ22 |
 
@@ -766,6 +767,7 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 - **来源**：Rapid 闸机进出站（tap-in-tap-out）的匿名交易数据
 - **规模**：官方说明 2023 年起每年的完整数据都超过 Excel 行数上限（1,048,576），建议使用 Parquet
 - **更新**：每天。例如 "Data as of 13 Oct 2026, 23:59"，"Last updated 14 Oct 2026, 19:03"，"Next update 15 Oct 2026, 22:00"
+- ✅ **2026-10-23 实测**（HTTP 头）：2026 年文件约 5.1 MB，`Last-Modified` 为 2026-10-22 08:02 UTC（16:02 MYT），与页面写的 22:00 不一致；**2025 年的文件在 2026-04-02 仍被更新**，说明旧年份的数据也会被修订。服务器提供 `ETag`，可以用 HEAD 请求低成本判断是否变化
 - **下载**：
   - CSV：`https://storage.data.gov.my/transportation/rail/rapidrail_2026_daily.csv`
   - Parquet：`https://storage.data.gov.my/transportation/rail/rapidrail_2026_daily.parquet`
@@ -831,60 +833,15 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 > 2. **真实的数据量**：每年超过 100 万行，与 GPS 数据合起来让湖仓更有说服力
 > 3. **业务价值**：需求加权可靠性让项目从"测量"走向"决策支持"
 > 4. **与已有维度契合**：站点代码很可能可以直接关联 rapid-rail-kl 的 `stop_id`
-> 5. **没有时间压力**：数据有完整历史，**不需要现在开始采集**，可以等 MVP 完成后再一次性回填
+> 5. ~~没有时间压力：数据有完整历史，不需要现在开始采集，可以等 MVP 完成后再一次性回填~~ **2026-10-23 更新**：处理仍在 MVP 之后，但**采集从现在开始**。文件整份覆盖，旧年份也会被修订，只在需要时下载会丢掉中间的修订版本，而修订历史本身就是数据质量证据（坑点 6）。文件只有约 5 MB，所以由 VM 每 3 小时用 HEAD 比较 `ETag`，变化时才下载，保留每个不同的版本（`ingestion/download_ridership.py`），同时检查今年和去年的文件
 >
 > **限制**：只有轨道、日粒度，所以不作为可靠性指标本身的输入，只作为需求背景和关联分析。
 
-### 6.5 行政区人口（DOSM）
+### 6.5 行政区人口（DOSM）❌ 已移出范围
 
-#### 6.5.1 官方结构 ✅
-
-- **名称**：Population Table: Administrative Districts
-- **内容**：2020 到 2026 年，按县、性别、年龄组、族群划分的人口
-- **更新**：每年。最近更新 2026-10-07；下次更新 2027-10-31
-- **下载**：
-  - CSV：`https://storage.dosm.gov.my/population/population_district.csv`
-  - Parquet：`https://storage.dosm.gov.my/population/population_district.parquet`
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `date` | Date | 每年 01-01 |
-| `state` | Categorical | 16 个州之一 |
-| `district` | Categorical | 160 个行政县之一；Perlis 和三个联邦直辖区没有下级划分，县名等于州名 |
-| `sex` | Categorical | `both`、`male`、`female` |
-| `age` | Categorical | `overall` 或 5 岁一组（0-4 到 85+） |
-| `ethnicity` | Categorical | `overall`、`bumi_malay`、`bumi_other`、`chinese`、`indian`、`other_citizen`、`other_noncitizen` |
-| `population` | Float | **单位：千人** |
-
-**样本**：
-
-| state | district | date | sex | age | ethnicity | population |
-|---|---|---|---|---|---|---|
-| W.P. Kuala Lumpur | W.P. Kuala Lumpur | 2024-01-01 | both | overall | overall | 2067.5 |
-| W.P. Kuala Lumpur | W.P. Kuala Lumpur | 2022-01-01 | both | 0-4 | overall | 115.4 |
-| W.P. Kuala Lumpur | W.P. Kuala Lumpur | 2022-01-01 | both | overall | chinese | 730.7 |
-| Selangor | Gombak | 2020-01-01 | both | overall | overall | 942.4 |
-
-#### 6.5.2 坑点
-
-| # | 坑点 | 处理 |
-|---|---|---|
-| 1 | **一张表混合了多个切片**（总计、按性别、按年龄、按族群）。直接按县求和会把人口算好几倍 | 只取 `sex = both`、`age = overall`、`ethnicity = overall`（DQ29） |
-| 2 | 单位是千人，而且是浮点数 | 乘以 1000，四舍五入 |
-| 3 | 💡 2020 年是普查年，之后的年份可能是估算值 | 论文中说明 |
-| 4 | W.P. Kuala Lumpur 和 Putrajaya 的县名等于州名，粒度比 Selangor 的县粗 | 不同地区的对比要说明粒度差异 |
-| 5 | 县名与 MET 天气地点名称可能不一致 | 映射表 |
-| 6 | **需要"站点 → 县"的映射**，也就需要县界地理数据 | 依赖 V11 |
-| 7 | 族群、年龄等敏感维度 | **不使用**，避免不必要的敏感分析 |
-
-#### 6.5.3 决定
-
-> 🟡 **可选。P3 与 `dim_location` 一起做；如果找不到可用的县界数据，就放弃，列入 Future Work。**
+> **2026-10-23 决定：移出范围，不采集、不建模。**它只能提供"每 10 万居民的服务量"这类背景属性，对 RQ1–RQ5 都没有直接帮助；真正的成本在"站点 → 县"的空间映射，而这一步依赖还没确认的县界数据（V11）。为了控制范围，直接放弃。相应的 E40、DQ29、V10 停用，编号保留不再使用。
 >
-> **理由**：
-> - 能提供的只是"每 10 万居民的服务量"这类背景指标，对核心研究问题帮助有限
-> - 真正的成本不在下载，而在"站点 → 县"的空间映射，而这一步与县级天气共用同一个依赖（县界数据）。**如果县界数据可得**，两者可以一起做，边际成本很低；**如果不可得**，不值得为它投入时间
-> - 实现方式很简单：`seed` 或一次性下载，取最新年份的 overall 行，作为 `dim_location` 的属性
+> 留作参考：数据为 DOSM "Population Table: Administrative Districts"（`https://storage.dosm.gov.my/population/population_district.parquet`），2020–2026 年，按县、性别、年龄组、族群划分，单位是千人；一张表混合了多个切片，直接求和会重复计算。
 
 ### 6.6 其他已知但不采用的数据源
 
@@ -908,11 +865,10 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 |---|---|---|---|---|---|---|
 | GTFS-RT kl | OpenAPI | 每 30 秒 | 2880 | `bronze/gtfs_rt/feed=rapid-bus-kl/date=/hour=/<UTC时间>.pb` | `(feed, vehicle_id, timestamp)` | — |
 | GTFS-RT feeder | OpenAPI | 每 30 秒（与 kl 错开 15 秒） | 2880 | `bronze/gtfs_rt/feed=rapid-bus-mrtfeeder/...` | 同上 | — |
-| GTFS Static × 3 | OpenAPI | 每天 04:00，每个间隔 ≥ 20 秒 | 3 | `bronze/gtfs_static/feed=/date=/gtfs.zip` + `.sha256` | 文件哈希 | 哈希变化 → 新版本（SCD2） |
-| 天气预报 | OpenAPI | 每 3 小时 | 8 | `bronze/weather_forecast/date=/fetched_at=.json` | `(location_id, date, 采集时间)` | 内容哈希 |
-| 天气警告 | OpenAPI | 每小时 | 24 | `bronze/weather_warning/date=/hour=.json` | `(issued, title_en, valid_from)` | 内容哈希 |
-| Rapid Rail OD 客流 | 文件下载 | 每天 23:00（官方 22:00 更新之后） | 1 | `bronze/ridership_rapidrail/year=2026/downloaded=YYYY-MM-DD/rapidrail_2026_daily.parquet` + `.sha256` | `(date, origin, destination)` | 文件哈希 + 最大日期 |
-| 行政区人口 | 文件下载 | 每月检查一次 | ≈ 0 | `bronze/population_district/downloaded=/population_district.parquet` | `(state, district, date, sex, age, ethnicity)` | 文件哈希 |
+| GTFS Static × 3 | OpenAPI | 每天 04:17，每个间隔 ≥ 20 秒 | 3 | `bronze/gtfs_static/<category>/blobs/` + `snapshots.jsonl`（按文件去重，§3.7.1） | 文件哈希 | 按文件比较；是否构成新版本由 Silver 判断（SCD2） |
+| 天气预报 | OpenAPI | 每 3 小时（:05） | 8 | `bronze/weather_forecast/date=/fetched_at=.json.gz` | `(location_id, date, 采集时间)` | 内容哈希 |
+| 天气警告 | OpenAPI | 每小时（:35） | 24 | `bronze/weather_warning/date=/fetched_at=.json.gz` | `(issued, title_en, valid_from)` | 内容哈希 |
+| Rapid Rail OD 客流 | 文件下载（不占 OpenAPI 限额） | 每 3 小时（:50）HEAD 比较 ETag，今年和去年两个文件 | 16 次 HEAD，变化时 1 次下载 | `bronze/ridership_rapidrail/year=/downloaded=/fetched_at=.parquet` + `versions.jsonl` | `(date, origin, destination)` | ETag + sha256 |
 | 公共假期 | dbt seed（Git） | 每年 + 临时公告 | 0 | `seeds/seed_public_holidays.csv` | `(holiday_date, state_code)` | Git 历史 |
 
 ### 7.2 限流预算
@@ -955,7 +911,7 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 | DQ26 | 客流 | `(date, origin, destination)` 唯一；`ridership ≥ 0`；最新日期不早于"今天 − 2 天" | 唯一性、有效性、时效性 | 🔴 / 📊 |
 | DQ27 | 客流 | 站点代码能关联到 rapid-rail-kl 的站点（覆盖率 ≥ 95%，未匹配的列出） | 一致性 | 📊 |
 | DQ28 | 公共假期 | `(holiday_date, state_code)` 唯一；seed 覆盖到"今天 + 90 天" | 唯一性、完整性 | 📊（失败时提醒更新） |
-| DQ29 | 人口 | 只保留 `sex = both`、`age = overall`、`ethnicity = overall`；转换为人数后为正数 | 一致性、有效性 | 🔧 |
+| DQ29 | （停用） | 行政区人口已移出范围（§6.5），编号保留 | — | — |
 
 ---
 
@@ -969,8 +925,8 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 | 天气预报 | ✅ 采用 | 环境维度 | **P0** | P3（州级 MVP，县级可选） | 没有历史；成本低；有建模话题 |
 | 天气警告 | 🟡 只归档 | 事件 | P0 | Future Work | 地区信息在自由文本中，解析成本高 |
 | 公共假期 | ✅ 采用 | 日期维度（seed） | 不需要采集 | **MVP** | 没有官方 API；seed 权威、可审计、可测试 |
-| Rapid Rail OD 客流 | ✅ 次核心 | 次事实 | FYP 1 中后段（一次回填） | FYP 1 中后段 | 批处理技能展示价值高；有完整历史，不急 |
-| 行政区人口 | 🟡 可选 | 地区属性 | 需要时一次下载 | P3 或 Future | 价值有限；取决于县界数据 |
+| Rapid Rail OD 客流 | ✅ 次核心 | 次事实 | ✅ 2026-10-23 起 VM 归档每个版本 | FYP 1 中后段 | 批处理技能展示价值高；有完整历史，不急 |
+| 行政区人口 | ❌ 移出范围（2026-10-23） | — | — | — | 价值有限；取决于县界数据 |
 | 实际观测天气 | ❓ 待定 | 环境维度 | FYP 2 | FYP 2 可选 | 弥补预报的局限，但增加外部依赖 |
 
 ---
@@ -990,8 +946,8 @@ data.gov.my **没有**公共假期的官方 API，只有第三方网站或 Pytho
 | V07 | 全天车辆数曲线 | 同一个平日在 08:00、13:00、18:00、23:00 各运行一次 `check_realtime.py` | 写 Proposal 前（用于规模估算） |
 | V08 | 速度单位 | 采集服务上线后，统计一天的速度分布 | P0 后 |
 | V09 | 客流：2023、2024、2025 年文件是否存在（把 URL 中的 `2026` 改成对应年份）；各年文件大小和行数；不同站点代码数量；代码是否与 rapid-rail-kl 的 `stop_id` 一致；是否包含 BRT；客流为 0 的组合是否省略；明细之和是否等于 A0 行 | 下载 Parquet，用 pandas 检查 | FYP 1 中后段前（也可提前，用于 Proposal 数据章节） |
-| V10 | 人口：巴生谷各县的名称列表（W.P. Kuala Lumpur、W.P. Putrajaya、Selangor 下各县） | 下载 Parquet | P3 前 |
-| V11 | 有没有开放的**县界 GeoJSON**（data.gov.my 或其他官方来源） | 搜索 data.gov.my 和 DOSM | P3 前（决定人口和县级天气是否采用） |
+| V10 | ❌ 取消（行政区人口已移出范围，§6.5） | — | — |
+| V11 | 有没有开放的**县界 GeoJSON**（data.gov.my 或其他官方来源） | 搜索 data.gov.my 和 DOSM | P3 前（决定县级天气是否采用） |
 | V12 | 2026、2027 年 W.P. Kuala Lumpur、Selangor、W.P. Putrajaya 的官方假期列表来源 | 政府官方公告 | MVP 前（2027 年列表通常在前一年下半年公布） |
 | V13 | trip updates、service alerts 是否已推出 | 每月看一次 developer.data.gov.my 的 changelog | 持续 |
 | V14 | `problematic_trips.csv` 的行数，其中的 `trip_id` 是否出现在 Realtime 中 | 下载并比对 | 写代码前 |
