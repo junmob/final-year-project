@@ -62,7 +62,7 @@
 # 5. 云端采集 VM 的选择与过渡方案（2026-10-22 更新）
 
 - **Oracle Cloud**：新加坡区一直无法创建实例（Out of capacity / Invalid Parameter）。另外，Oracle 在 2026 年把免费 A1 额度从 4 OCPU / 24 GB 减为 2 OCPU / 12 GB。可以继续在后台重试，但不再依赖它。
-- **Azure for Students**：用 1utar.my 邮箱验证时显示 "You do not have access"，推测是休学期间学生身份状态被改动。正在请在校朋友测试他们能否开通：如果能，说明问题出在本人账号的状态，**复学（2027-01-25）后再申请 Azure for Students 作为长期方案**。
+- **Azure for Students**：用 1utar.my 邮箱验证时显示 "You do not have access"，推测是休学期间学生身份状态被改动。**2026-10-22 更新：在读的朋友用 1utar.my 邮箱同样失败**，所以问题不在本人的休学状态，而是 UTAR 的邮箱或学校本身目前不被 Azure for Students 接受。复学后再申请也很可能失败，**不能再把它当作 AWS 到期（2027-04-22）后的长期方案**，需要另找（待讨论）。正在请在校朋友测试他们能否开通：如果能，说明问题出在本人账号的状态，**复学（2027-01-25）后再申请 Azure for Students 作为长期方案**。
 - **过渡方案（现在到复学）**：
   1. **先试 GCP e2-micro**（美国区，Standard 磁盘 30 GB，默认 IPv4）。上线 2–3 天后在 Billing 报表查看 SKU 明细。**如果外部 IPv4 收费，就不继续用 GCP**（不采用只用 IPv6 的方案），转第 2 步。
   2. **AWS 新账户 Free Plan**（最多 200 美元额度，6 个月后自动关闭）作为过渡。
