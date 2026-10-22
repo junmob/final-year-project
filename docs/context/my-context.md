@@ -98,4 +98,6 @@
 5. **导师**：给 Sir Wong 发消息；10-26 开学后跟进 Ms. Ashikin。
 6. **AWS 新手任务**：EC2 那项的 20 美元额度没有到账，有空再看 Billing → Credits，不强求。
 7. **2027-04 前**：决定 AWS 到期后的 VM（Azure for Students 不可行；候选：Oracle 重试、小 VPS、只在本地采集），按手册 §12.6 迁移。演示方案也要在 FYP 1 presentation 前定下（设计书 §12.3）。
-8. 11 月中旬起，按路线图穿插 P1 湖仓基础（本地 Docker：MinIO、Iceberg、Polaris、Spark），届时给 `bronze_sync` 加上写入 MinIO 的步骤。
+8. **采集器 CI 与部署脚本**（2026-11，和 Proposal 穿插）：pytest 单元测试 + ruff + GitHub Actions 工作流 + `deploy.sh`；做完后写 `docs/learning/ci-guide.md`。
+9. **Git tag**：`v0.1-collector` 已打（2026-10-23）；之后的计划：`v0.2-lakehouse`（M1）、`v1.0-mvp`（M3）、`v1.1-fyp1`、`v1.2-portfolio`（05-31）、`v2.0-fyp2`；采集代码改变数据格式时打小版本。
+10. 11 月中旬起，按路线图穿插 P1 湖仓基础（本地 Docker：MinIO、Iceberg、Polaris、Spark），届时给 `bronze_sync` 加上写入 MinIO 的步骤。

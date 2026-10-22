@@ -808,7 +808,7 @@ flowchart TD
 | 可观测性 | **Prometheus + Grafana** | | 采集成功率、Kafka 消费延迟、容器资源 | P4 |
 | 治理与安全 | **ClickHouse 角色权限** + 车牌加盐哈希 + dbt 血缘与源到目标映射文档 | | engineer / analyst 两种角色；审计追溯 | P3 |
 | 容器 | **Docker Compose**（按 profile 启动） | | 一键复现 | P1 |
-| CI | **GitHub Actions**：ruff、pytest、sqlfluff、用样本数据跑 `dbt build`；另有每日 Static 检查与按文件去重存档（已上线） | | 代码与数据测试自动化 | P3（备份已上线） |
+| CI | **GitHub Actions**：ruff、pytest、sqlfluff、用样本数据跑 `dbt build`；另有每日 Static 检查与按文件去重存档（已上线） | | 代码与数据测试自动化 | 采集器部分 P1（2026-11），dbt 与 SQL 部分 P3；备份已上线 |
 
 各组件的具体版本以实施时的稳定版为准，并在 `docker-compose.yml` 中锁定。
 
@@ -921,7 +921,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 阶段 | 时间 | 学校方面 | 技术方面 | 求职方面 |
 |---|---|---|---|---|
 | **P0 采集上线** | **2026-10-21 → VM 到手即上线（目标 11-10 前）** | | C 档先行：本地开机时运行采集服务；VM 到手后切换到 A 或 B 档；天气预报开始归档；每日打包与 manifest | |
-| **P1 湖仓基础** | 2026-11 → 2026-12 | 写 IIPSPW Proposal（11 月中开始） | 本地 `lake`、`batch` profile；`bronze_sync`；Spark 解析 Bronze → Iceberg Raw/Silver；DQ01–DQ12；Static SCD2 与 DQ13–DQ19；Polaris；Kafka 接入（发布器或中继） | 补 Spark 与 Iceberg 基础 |
+| **P1 湖仓基础** | 2026-11 → 2026-12 | 写 IIPSPW Proposal（11 月中开始） | **先做采集器的自动测试**（pytest 单元测试、ruff 代码检查、GitHub Actions CI 工作流）和部署脚本 `deploy.sh`，与 Proposal 写作穿插进行；然后：本地 `lake`、`batch` profile；`bronze_sync`；Spark 解析 Bronze → Iceberg Raw/Silver；DQ01–DQ12；Static SCD2 与 DQ13–DQ19；Polaris；Kafka 接入（发布器或中继） | 补 Spark 与 Iceberg 基础 |
 | **IIPSPW 提交** | **目标 2027-01 上旬（复学前）；推算的截止日约为 Sem 1 Week 8 星期五 17:00，即 2027-03-19 前后（非官方）** | ⭐ 提交重写版 Proposal（纯文字，Word + PDF 发邮件给导师）+ FYP 1 amendment form（导师签名；换导师则两位都签） | | |
 | **P2 MVP** | 2026-12 → 2027-02 | FYP 1 开学（01-25）；写 FYP 1 Ch1–Ch3（大部分从 Proposal 扩写） | ClickHouse + dbt-clickhouse 构建 Gold；半径法到站推断；试点路线 OTP；至少 10 条 DQ 规则以测试形式运行；Airflow 串起全流程；Metabase 看板 ①②⑥；假期 seed | 整理 README 初版 |
 | **P3 全面推广** | 2027-03 → 2027-04 | 3 月写 FYP 1 Ch4（成果截至 3 月底）与 Ch5；⭐ **FYP 1 报告在 Week 12（04-12 至 04-18）提交**；随后 presentation（PPT + 代码 + MVP 现场演示，确切日期 ❓） | mrtfeeder 全部路线；rapid-bus-kl 发车间隔、EWT、串车；线性参照插值；天气（州级）；客流回填（2023 年起）与每日 MERGE；`dim_location` 实体对齐；RBAC 与脱敏；CI；SLO 与切换演练；dbt docs；看板 ③④⑤⑦ | 练 SQL 题与 CS 基础 |
@@ -1289,6 +1289,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 确认导师是否接受"工程型 + 评估型"的 FYP | FYP 1 开学时 | v0.2 遗留事项 |
 | 确认问卷的伦理要求 | FYP 1 开学时 | §2 |
 | 选定告警通道（本地关机期间） | P0 | §8.3.6 |
+| **采集器 CI 与部署脚本** | 2026-11（与 Proposal 穿插） | pytest 覆盖时间槽计算、指纹比较、打包与校验、Static 拆包去重；ruff；push 时由 GitHub Actions 自动运行；`deploy.sh` 一条命令完成同步、必要时重启、健康检查。不做“push 后自动部署到 VM”，因为那要放宽安全组（只允许本人 IP 的 SSH），报告中说明这一取舍 |
 | **演示方案**（没有笔记本，presentation 默认线下） | FYP 1 presentation 前（2027-04） | 待定：演示视频必备；学校电脑用 Chrome Remote Desktop 连回家中桌机；或演示当天临时开云端 VM 跑精简组合；确认能否申请线上演示。注意 AWS 账户 2027-04-22 关闭 |
 | **AWS 到期后的采集 VM** | 2027-04 前 | Azure for Students 不可行；候选：Oracle 继续重试、每月约 4–6 美元的小 VPS、最后几个月只在本地开机时采集 |
 
@@ -1619,5 +1620,5 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
-| v0.4 修订 | 2026-10-23 | `bronze_sync` 第一版（rsync 拉取 + 按 manifest 校验，写入本地 `~/fyp-data/bronze/`；MinIO 与 Airflow 待湖仓建好）；删除一次性脚本 `check_realtime.py`；`data/raw/` 改名为 `data/github-backup/`。采集：Static、天气、客流由 VM 上的 systemd timer 采集，客流改为云端归档每个版本；行政区人口移出范围（DQ29、E40 停用）。范围：RQ3 只做 Spark Structured Streaming（方案 B 移到 Future Work）；RQ4 改为 3 种系统、W1–W5；RQ1 增加留出验证、物理合理性检查和实地观测的安排；新增 stretch 目标 O7/RQ5（MCP + 本地 LLM）与 N7、§14.9；标题不变；记录 Azure for Students 不可行、演示方案待定 |
+| v0.4 修订 | 2026-10-23 | 采集器 CI 与 `deploy.sh` 提前到 P1；打 tag `v0.1-collector`。`bronze_sync` 第一版（rsync 拉取 + 按 manifest 校验，写入本地 `~/fyp-data/bronze/`；MinIO 与 Airflow 待湖仓建好）；删除一次性脚本 `check_realtime.py`；`data/raw/` 改名为 `data/github-backup/`。采集：Static、天气、客流由 VM 上的 systemd timer 采集，客流改为云端归档每个版本；行政区人口移出范围（DQ29、E40 停用）。范围：RQ3 只做 Spark Structured Streaming（方案 B 移到 Future Work）；RQ4 改为 3 种系统、W1–W5；RQ1 增加留出验证、物理合理性检查和实地观测的安排；新增 stretch 目标 O7/RQ5（MCP + 本地 LLM）与 N7、§14.9；标题不变；记录 Azure for Students 不可行、演示方案待定 |
 | v0.4 | 2026-10-20 | 合并 v0.2 与 v0.3；重新设计采集层（三档 VM 方案）；按 my-context 与 UTAR 校历重排路线图；新增与三份报告的映射、评估与实验设计、合并说明 |
