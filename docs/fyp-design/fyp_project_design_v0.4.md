@@ -32,7 +32,7 @@
 | 5 | **可追溯**（数据血缘与审计） | 指标有疑问时，可以一路追回到最原始的那个 `.pb` 文件 |
 | 6 | **天气预报同样没有历史接口**（summary §6.1.3，💡 待 V01 确认） | 天气与准点率的分析范围只能从开始归档那天算起 |
 
-**成本**：按实测，每次下载约 6–11 KB（晚间），两个 feed 每天各 2880 次，合计**每天约 50–60 MB**，6 个月约 10 GB。⏳ 这是晚间样本推算的上限估计：白天高峰车辆可能更多（V07），而 2026-10-20 02:11 的云端探测显示深夜 rapid-bus-kl 在线车辆为 0、文件仅 15 字节，全天平均可能更低。数字待 V06/V07 实测校准。
+**成本**：按实测，每次下载约 6–11 KB（晚间），两个 feed 每天各 2880 次，合计**每天约 50–60 MB**，6 个月约 10 GB。✅ V07（2026-10-21）：傍晚高峰单次最大约 11 KB（kl 98 辆、feeder 145 辆），深夜 kl 为 0 辆、文件 15 字节，所以这个数字是上限，全天平均更低。准确值以 VM 首个完整日（10-22）打包 manifest 的 `raw_bytes` 为准。
 
 > [!IMPORTANT]
 > 这就是业界的"**不可变原始层**"（immutable raw / Bronze layer）原则：原始数据原样保存、永不修改，所有清洗都在下游完成。面试经常会问到。
@@ -236,7 +236,7 @@
 | 数据新鲜度延迟 | $L = t_{\text{ingest}} - t_{\text{vehicle}}$，取中位数和 P95 | 衡量 GPS 时间戳有多旧；同时解析 `FeedHeader.timestamp`，计算 feed 自身的生成延迟 |
 | 有效记录率 | 通过所有阻断性规则的记录数 ÷ 总记录数 | |
 | 重复率 | 重复的 `(feed, vehicle_id, timestamp)` 数量 ÷ 总记录数 | 来自轮询 |
-| Trip 匹配率 | 能匹配到当天有效 Static 的 `trip_id` 数量 ÷ 带 `trip_id` 的记录数 | 实测 86% 到 90%（⏳ V06 用同日 Static 重新比对） |
+| Trip 匹配率 | 能匹配到当天有效 Static 的 `trip_id` 数量 ÷ 带 `trip_id` 的记录数 | 同日 Static 实测：上午约 99%，傍晚 91–97%，深夜 83–86%（V06 ✅，原因见 summary §4.4） |
 | 到站推断覆盖率 | 成功推断到站的站点数 ÷ 被观测班次应经过的站点数 | 衡量算法效果 |
 | Bronze 同步完整率 | 本地 Bronze 中某天的文件数 ÷ 云端 manifest 记录的文件数 | 必须为 100%（NFR2），否则不清理云端文件 |
 | Gold 新鲜度 | 当前时间 − Gold 层最新完整小时 | 只在本地加工节点开机期间考核（见 §13 SLO） |
@@ -334,7 +334,7 @@ $$
 | # | 难点 | 解决思路 |
 |---|---|---|
 | D1 | 从 30 秒采样的稀疏 GPS 推断到站时间（没有 trip updates，E13） | 先用半径法，再改进为线性参照插值（第 5 节），全部在 PySpark 中实现 |
-| D2 | ID 对不上：mrtfeeder 的 `routeId` 用的是 `route_long_name`（E01）；`tripId` 匹配率 86% 到 90%（E02） | 建版本化映射表；去掉后缀后再匹配（V05）；用当天的 Static 版本匹配（V06） |
+| D2 | ID 对不上：mrtfeeder 的 `routeId` 用的是 `route_long_name`（E01）；`tripId` 匹配率随时段从 99% 降到 83%（E02、E45） | 建版本化映射表；三级匹配：完整 `trip_id` → 去掉末尾序号匹配路线 + 方向（V05 ✅）→ 仍对不上的进 quarantine 并单独统计（E45）；用当天的 Static 版本匹配 |
 | D3 | 时刻表版本变化（E32） | 每天检查快照，分两层处理：**Bronze 按文件、按内容哈希去重存档**（任何字节变化都保留，可还原任意一天的完整内容；`download_gtfs_static.py` 已实现）；**Silver 再判断是否构成真正的新版本**（SCD Type 2），忽略只因 `calendar.txt` 起始日期滚动、行顺序变化或 `__MACOSX/` 打包文件产生的伪变化（summary §3.4.2、§3.7）；Realtime 数据用 as-of join 关联当天有效的版本 |
 | D4 | 服务日期与跨午夜班次 | 时间戳是 UTC epoch，要转成 `Asia/Kuala_Lumpur`；GTFS 时间超过 24 小时要特别处理；mrtfeeder 缺 `startDate`（E05），用时间戳和时刻表推断 |
 | D5 | 重复、乱序、迟到的数据（E07） | 去重键 `(feed, vehicle_id, timestamp)`；Iceberg 用 `MERGE INTO` 或按分区覆盖写入保证幂等；流处理中使用水位线（watermark） |
@@ -360,7 +360,7 @@ $$
 | DQ06 | RT | 速度单位统一为 m/s，> 100 km/h 标记 | 一致性 | 🔧 + 🟡 | **实测 E04：mrtfeeder 的速度疑似 km/h**（V08 用一天的分布确认） |
 | DQ07 | RT | 相邻两点推算的速度 ≤ 120 km/h（检测"瞬移"） | 准确性 | 🟡 | 通用 |
 | DQ08 | RT | `(feed, vehicle_id, timestamp)` 唯一 | 唯一性 | 🔧 去重 | **实测 E07：轮询造成重复** |
-| DQ09 | RT | `trip_id` 存在于当天有效的 Static 中 | 一致性 | 🟡；匹配率 < 80% 时📊 告警 | **实测 E02：86% 到 90%**（⏳ V06） |
+| DQ09 | RT | `trip_id` 存在于当天有效的 Static 中 | 一致性 | 🟡；按时段与 7 天基线比较后📊 告警（不用固定阈值） | **实测（同日 Static）：99% → 83%**（V06 ✅，E02、E45） |
 | DQ10 | RT | mrtfeeder 的 `routeId` 通过 long_name 映射成 `route_id`（前提：`route_long_name` 在同一版本内唯一，用测试保证） | 一致性 | 🔧 | **实测 E01：匹配率 0%** |
 | DQ11 | RT | `bearing` 在 0 到 360 之间 | 有效性 | 🟡 | 通用 |
 | DQ12 | RT | `vehicle_id` 格式标准化（车牌和 `RAPID443`、`RPD429` 这类内部编号） | 一致性 | 🔧 | **实测 E06** |
@@ -1072,7 +1072,7 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 证据 | 状态（2026-10-20） | 在 Ch4 中的用途 |
 |---|---|---|
 | 数据源剖析与实测（10/5、10/11 两次实测；10/20 云端探测；E01–E44 脏点目录） | ✅ 已有（summary、`docs/evidence/`） | 证明对数据源的理解与问题的真实性 |
-| V06/V07 全天四次实测（2026-10-21） | ⏳ 已排程 | 规模估算、trip 匹配率、全天车辆数曲线 |
+| V06/V07 全天实测（2026-10-21） | ✅ 成功 3 次（23:00 那次被 GitHub 延迟后失败，不补跑），结论见 summary §4.4 | 规模估算、trip 匹配率、全天车辆数曲线 |
 | GTFS Static 每日检查与按文件去重存档（GitHub Actions；`snapshots.jsonl` 记录每天每个文件的哈希） | ✅ 已上线 | 证明版本化方案可行；可统计各运营商的真实更新频率与伪版本比例 |
 | RT 采集原型本地测试 | ✅ 已有 | 采集方案可行 |
 | 云端 VM 部署与连续采集统计（可用率、断档分类） | ❌ 需在 FYP 1 前完成（M0） | O1 的核心证据 |
@@ -1525,8 +1525,8 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 | 1 | `ingestion/collect_gtfs_rt.py` | ✅ 2026-10-22 已改：英文、输出 `bronze/gtfs_rt/...`、轻量 Protobuf 校验分类（`ok`/`ok_empty`/`parse_error` 等，无法解析的存 `_invalid/`）、健康记录带 `instance`；新增 `pack_gtfs_rt.py` 每日打包 + manifest；已部署到 AWS EC2（悉尼）。还缺 Static、天气、`/metrics`、发布器。原问题：输出根目录是 `data/raw/gtfs_realtime/feed=...`，本设计为 `bronze/gtfs_rt/feed=...`；只采集 RT，没有 Static、天气、每日打包、manifest、`/metrics`、发布器；健康记录没有 `ok_empty`、`parse_error` 等状态分类 | P0 时按 §8.3.3 扩展；状态分类可以在采集端只做轻量的 Protobuf 校验 |
 | 2 | `ingestion/deploy/gtfs-rt-collector.service` | ✅ 2026-10-22 已按 VM 实际路径修改，另加 `gtfs-rt-pack.service/.timer` 与 `install.sh`。原问题：用户名和路径是占位值 | 部署到 VM 时按实际修改，另外开启 NTP |
 | 3 | `scripts/download_gtfs_static.py` | 输出为平铺的 `data/raw/gtfs_static/<category>_<YYYYMMDD>.zip` + `manifest.json`，本设计为 `bronze/gtfs_static/feed=/date=/gtfs.zip` + `.sha256`；日期取运行环境的本地日期（GitHub runner 为 UTC），没有重试 | 并入采集服务的 Static 模块时统一路径、显式使用马来西亚时间；`bronze_sync` 负责把已有存档映射到新路径 |
-| 4 | `.github/workflows/backup_gtfs.yml` | ✅ 2026-10-21 已改为每天 04:17 MYT 检查；`download_gtfs_static.py` 改为按文件、按内容哈希去重（`<category>/blobs/` + `snapshots.jsonl`），旧的平铺 ZIP 已导入为快照 | 旧 ZIP 与 `manifest.json` 暂时保留，因为 `realtime_probe.yml` 仍会 `git add` 它们；实测结束、删除 probe workflow 时一并清理 |
-| 5 | `.github/workflows/realtime_probe.yml` | 一次性实测，但 cron 每年同一天都会触发 | 2026-10-21 实测完成后删除（文件内已注明） |
+| 4 | `.github/workflows/backup_gtfs.yml` | ✅ 2026-10-21 已改为每天 04:17 MYT 检查；`download_gtfs_static.py` 改为按文件、按内容哈希去重（`<category>/blobs/` + `snapshots.jsonl`），旧的平铺 ZIP 已导入为快照 | ✅ 2026-10-22 已删除旧 ZIP 和 `manifest.json`；`check_realtime.py` 改为读取快照 |
+| 5 | `.github/workflows/realtime_probe.yml` | 一次性实测，但 cron 每年同一天都会触发 | ✅ 2026-10-22 已删除 |
 | 6 | summary §7.3 部署分工 | ① 客流文件下载放在云端 VM，本设计改为本地 Airflow（客流文件整份覆盖、含全年历史，代价是本地关机期间可能错过中间的修订版本）；② "演示时在本地临时启动一个采集实例直接写 Kafka"会让 RT 请求翻倍，本设计改为中继和回放；③ "同步后清理 VM 旧文件"改为"磁盘允许时保留完整副本，校验通过后才清理"；④ A 档在云端运行 MinIO 和 Kafka，与"云端不运行 Kafka"不同 | ✅ 2026-10-20 已在 summary §7.3 加注：以本设计 §8.3 为准 |
 | 7 | summary §2.3、§10 的 V02 | summary 中 V02 仍为 ❓ | ✅ 2026-10-20 已更新 |
 | 8 | summary §7.1 | Static 每天 04:00 与当前的每周 GitHub Actions 不一致 | 云端采集服务上线后即一致 |
@@ -1561,16 +1561,16 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 ### 15.4 待 V06/V07 实测校准的数字
 
-V06/V07 将在 2026-10-21 运行，结果存放在 `docs/evidence/realtime_probe/`。以下数字目前沿用 summary 的估算，实测后只需修改个别数字：
+✅ V06/V07 已于 2026-10-21 完成（成功 3 次，结论见 summary §4.4）。下表的“实测结果”一栏是本次的校准；数据量相关的数字要等 VM 首个完整日的打包 manifest 出来才能最终确定：
 
-| 数字 | 当前值 | 出现位置 | 由哪项实测校准 |
+| 数字 | 当前值 | 出现位置 | 由哪项实测校准（实测结果） |
 |---|---|---|---|
-| 每个 feed 的在线车辆数 | 80–123（晚间） | §0 | V07 |
-| 每天原始数据量 | 约 50–60 MB | §0 | V07 |
+| 每个 feed 的在线车辆数 | 80–123（晚间） | §0 | V07：✅ 高峰 kl 98、feeder 145，深夜 kl 0 |
+| 每天原始数据量 | 约 50–60 MB | §0 | V07：✅ 作为上限成立；准确值待 10-22 manifest |
 | 6 个月数据量 | 约 1 亿行、约 10 GB | §0、§3.5、§14.6 | V07 |
-| trip 匹配率 | 86%–90% | §5 L1、DQ09、§11.6 简历模板 | V06 |
-| DQ09 告警阈值 | 80% | §6 | V06 |
-| DQ21 的时段基线与小基数阈值 | 深夜 < 10 辆不比较 | §6 | V07 |
+| trip 匹配率 | 86%–90% | §5 L1、DQ09、§11.6 简历模板 | V06：✅ 同日 Static 99% → 83%，随时段下降（E02、E45）；§11.6 简历模板待改 |
+| DQ09 告警阈值 | 80% | §6 | V06：✅ 不用固定阈值，改为按时段与基线比较（DQ09 已改） |
+| DQ21 的时段基线与小基数阈值 | 深夜 < 10 辆不比较 | §6 | V07：✅ 成立（深夜 kl 为 0） |
 | GCP 每月出站流量估计 | 约 1.5–1.8 GB（压缩前） | §8.3.4 | V07 + 压缩率实测 |
 | RQ4 三档数据量 | 1 周、1 个月、约 6 个月 | §14.6 | V07 |
 | 速度单位 | mrtfeeder 疑似 km/h | DQ06 | V08（P0 上线后一天） |

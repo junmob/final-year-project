@@ -88,7 +88,7 @@
 
 1. ✅ **部署 RT 采集器到 EC2**（2026-10-22 完成，见 §5）。下一步：观察首个完整日（10-22）和 10-23 00:30 的首次打包，看压缩率和断档；然后写本地 `bronze_sync`（rsync 拉打包文件 + 按 manifest 校验）。原待办：把 `ingestion/collect_gtfs_rt.py` 改成英文；输出路径改为设计书 §8.3.3 的 `bronze/gtfs_rt/...`；加每日 `tar.zst` 打包 + manifest；systemd 开机自启；开启 NTP。之后再把 Static、天气模块并入采集服务。
 2. **AWS 新手任务**：确认 "Launch an instance using EC2" 已完成（+20 美元）。Bedrock、Lambda、RDS 三项暂不做。
-3. **10/21 实测收尾**：等最后一次（23:00 那次）结果提交后，把 V06/V07 结论写进 summary；删除 `.github/workflows/realtime_probe.yml`；清理 `data/raw/gtfs_static/` 下旧的平铺 ZIP 和 `manifest.json`（新格式已导入）。
+3. ✅ **10/21 实测收尾**（2026-10-22 完成：结论在 summary §4.4，新增 E45；probe workflow 和旧 ZIP 已删除；23:00 那次失败，不补跑）。原待办：等最后一次（23:00 那次）结果提交后，把 V06/V07 结论写进 summary；删除 `.github/workflows/realtime_probe.yml`；清理 `data/raw/gtfs_static/` 下旧的平铺 ZIP 和 `manifest.json`（新格式已导入）。
 4. **导师**：给 Sir Wong 发消息（草稿在对话中，可再生成）；10-26 开学后跟进 Ms. Ashikin。
 5. **Proposal**：第 1 步，起草 Ch2 大纲（英文，写在 `reports/proposal/ch2-lit-review.md`），然后检索文献。
 6. 复学后申请 Azure for Students；**2027-04 上旬前**从 AWS 迁出。

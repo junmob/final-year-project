@@ -29,7 +29,6 @@ import requests
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "data" / "raw" / "gtfs_static"
-LEGACY_MANIFEST = OUT_DIR / "manifest.json"
 URL = "https://api.data.gov.my/gtfs-static/prasarana?category="
 CATEGORIES = ["rapid-bus-kl", "rapid-bus-mrtfeeder", "rapid-rail-kl"]
 REQUEST_GAP_SECONDS = 20  # data-source summary §7.1: at least 20 s between requests
@@ -96,22 +95,11 @@ def ingest_zip(category: str, zip_bytes: bytes, checked_at: datetime, source: st
     return record
 
 
-def import_legacy_zips(category: str) -> None:
-    """One-off: import the old flat ZIP archive (<category>_<YYYYMMDD>.zip) in date order."""
-    if (OUT_DIR / category / "snapshots.jsonl").exists():
-        return
-    for path in sorted(OUT_DIR.glob(f"{category}_*.zip")):
-        day = datetime.strptime(path.stem.rsplit("_", 1)[1], "%Y%m%d").replace(tzinfo=MYT)
-        record = ingest_zip(category, path.read_bytes(), day, source=f"legacy:{path.name}")
-        print(f"[import] {category}: {path.name} -> changed {record['changed_files']}")
-
-
 def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     failed = False
 
     for i, category in enumerate(CATEGORIES):
-        import_legacy_zips(category)
         if i:
             time.sleep(REQUEST_GAP_SECONDS)
         checked_at = datetime.now(MYT)

@@ -1,70 +1,93 @@
 # check_realtime.py
-# 作用：下载 Realtime 数据，并检查 trip_id / route_id 能否匹配 Static 数据
-# pyrefly: ignore [missing-import]
-from google.transit import gtfs_realtime_pb2
-from google.protobuf.json_format import MessageToDict
+# Purpose: one-off probe. Downloads both GTFS Realtime feeds and checks whether trip_id /
+#          route_id match the latest archived GTFS Static (data-source summary §4.4).
+#          Output goes to docs/evidence/realtime_probe/ as evidence; this is not the
+#          long-running collector (see ingestion/collect_gtfs_rt.py).
+import gzip
+import io
+import json
+import time
 from datetime import datetime, timezone
+from pathlib import Path
+
 import pandas as pd
 import requests
-import time
-import zipfile
-from pathlib import Path
+from google.protobuf.json_format import MessageToDict
+from google.transit import gtfs_realtime_pb2
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = ROOT / "data" / "raw" / "gtfs_static"
-RT_DIR = ROOT / "docs" / "evidence" / "realtime_probe"  # 一次性实测证据，不是长期采集的 Bronze 数据
-RT_DIR.mkdir(parents=True, exist_ok=True)
+RT_DIR = ROOT / "docs" / "evidence" / "realtime_probe"
 FEEDS = ["rapid-bus-kl", "rapid-bus-mrtfeeder"]
-BASE = "https://api.data.gov.my/gtfs-realtime/vehicle-position/prasarana?category="
+# The trailing slash avoids a 301 redirect (which would cost a second request).
+BASE = "https://api.data.gov.my/gtfs-realtime/vehicle-position/prasarana/?category="
 
-for category in FEEDS:
-    print("=" * 60)
-    print(f"运营商: {category}")
 
-    resp = requests.get(BASE + category, timeout=30)
-    print(f"HTTP 状态码: {resp.status_code}, 文件大小: {len(resp.content)/1024:.1f} KB")
-    if resp.status_code != 200:
-        continue
+def latest_static_file(category: str, name: str) -> tuple[pd.DataFrame, str] | None:
+    """Read one file of the latest successful Static snapshot (see download_gtfs_static.py)."""
+    snapshots = STATIC_DIR / category / "snapshots.jsonl"
+    if not snapshots.exists():
+        return None
+    last = None
+    for line in snapshots.read_text(encoding="utf-8").splitlines():
+        if line.strip() and (record := json.loads(line)).get("status") == "ok":
+            last = record
+    if last is None or name not in last["files"]:
+        return None
+    digest = last["files"][name]
+    data = gzip.decompress((STATIC_DIR / category / "blobs" / digest[:2] / f"{digest}.gz").read_bytes())
+    return pd.read_csv(io.BytesIO(data), dtype=str), last["checked_at_myt"]
 
-    # 保存原始文件（之后的采集层也会这样做）
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")  # 统一用 UTC，避免本地与云端时区混淆
-    with open(RT_DIR / f"raw_{category}_{stamp}.pb", "wb") as f:
-        f.write(resp.content)
 
-    feed = gtfs_realtime_pb2.FeedMessage()
-    feed.ParseFromString(resp.content)
-    df = pd.json_normalize([MessageToDict(e.vehicle) for e in feed.entity])
-    print(f"在线车辆数: {len(df)}")
-    if df.empty:
-        continue
+def main() -> None:
+    RT_DIR.mkdir(parents=True, exist_ok=True)
+    for i, category in enumerate(FEEDS):
+        if i:
+            time.sleep(20)  # stay well inside the 4 requests/minute limit
+        print("=" * 60)
+        print(f"Feed: {category}")
 
-    print(f"所有字段: {list(df.columns)}")
-    print(df.head(5).to_string())
-    df.to_csv(RT_DIR / f"rt_{category}_{stamp}.csv", index=False)
+        resp = requests.get(BASE + category, timeout=30)
+        print(f"HTTP status: {resp.status_code}, size: {len(resp.content) / 1024:.1f} KB")
+        if resp.status_code != 200:
+            continue
 
-    # 数据新鲜度
-    if "timestamp" in df.columns:
-        ts = pd.to_numeric(df["timestamp"])
-        newest = datetime.fromtimestamp(ts.max(), tz=timezone.utc)
-        oldest = datetime.fromtimestamp(ts.min(), tz=timezone.utc)
-        print(f"最新 GPS 时间: {newest.astimezone()}，最旧: {oldest.astimezone()}")
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")  # UTC avoids time-zone mix-ups
+        (RT_DIR / f"raw_{category}_{stamp}.pb").write_bytes(resp.content)
 
-    # 关键检查：Realtime 与 Static 的 ID 匹配率
-    static_zips = sorted(STATIC_DIR.glob(f"{category}_*.zip"))
-    if not static_zips:
-        print(f"⚠️ 找不到 {category} 的 Static ZIP，请先运行 scripts/download_gtfs_static.py")
-        continue
-    print(f"使用 Static 版本: {static_zips[-1].name}")
-    with zipfile.ZipFile(static_zips[-1]) as z:
-        trips = pd.read_csv(z.open("trips.txt"), dtype=str)
-    for rt_col, st_col in [("trip.tripId", "trip_id"), ("trip.routeId", "route_id")]:
-        if rt_col in df.columns:
+        feed = gtfs_realtime_pb2.FeedMessage()
+        feed.ParseFromString(resp.content)
+        df = pd.json_normalize([MessageToDict(e.vehicle) for e in feed.entity])
+        print(f"Vehicles online: {len(df)}")
+        if df.empty:
+            continue
+
+        print(f"Fields: {list(df.columns)}")
+        print(df.head(5).to_string())
+        df.to_csv(RT_DIR / f"rt_{category}_{stamp}.csv", index=False)
+
+        if "timestamp" in df.columns:
+            ts = pd.to_numeric(df["timestamp"])
+            newest = datetime.fromtimestamp(ts.max(), tz=timezone.utc)
+            oldest = datetime.fromtimestamp(ts.min(), tz=timezone.utc)
+            print(f"Newest GPS time: {newest}, oldest: {oldest}")
+
+        static = latest_static_file(category, "trips.txt")
+        if static is None:
+            print(f"No Static snapshot for {category}; run scripts/download_gtfs_static.py first")
+            continue
+        trips, checked_at = static
+        print(f"Static snapshot used: {checked_at}")
+        for rt_col, st_col in [("trip.tripId", "trip_id"), ("trip.routeId", "route_id")]:
+            if rt_col not in df.columns:
+                print(f"Field {rt_col} not present in the Realtime feed")
+                continue
             rt_ids = df[rt_col].dropna().astype(str)
             matched = rt_ids.isin(set(trips[st_col]))
-            print(f"{rt_col} 匹配率: {matched.mean():.1%} "
-                  f"({matched.sum()}/{len(rt_ids)}，缺失 {df[rt_col].isna().sum()} 条)")
-            print(f"   对不上的例子: {rt_ids[~matched].head(5).tolist()}")
-        else:
-            print(f"⚠️ Realtime 数据里没有 {rt_col} 字段")
+            print(f"{rt_col} match rate: {matched.mean():.1%} "
+                  f"({matched.sum()}/{len(rt_ids)}, missing {df[rt_col].isna().sum()})")
+            print(f"   unmatched examples: {rt_ids[~matched].head(5).tolist()}")
 
-    time.sleep(20)  # 遵守限流：每分钟最多 4 次
+
+if __name__ == "__main__":
+    main()
