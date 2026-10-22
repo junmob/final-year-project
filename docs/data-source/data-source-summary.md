@@ -362,7 +362,7 @@
 
 #### 3.7.1 实际观察到的更新行为（2026-10-19 → 10-21）
 
-`data/raw/gtfs_static/<category>/snapshots.jsonl` 每天记录 ZIP 内每个文件的哈希。第一次比较的结果：
+`data/github-backup/gtfs_static/<category>/snapshots.jsonl`（VM 上为 `bronze/gtfs_static/<category>/`） 每天记录 ZIP 内每个文件的哈希。第一次比较的结果：
 
 | 运营商 | 有变化的文件 | 性质 |
 |---|---|---|
@@ -426,7 +426,7 @@ vehicle_positions = [MessageToDict(entity.vehicle) for entity in feed.entity]
 
 ### 4.4 实测记录 ✅
 
-**方法**：`check_realtime.py` 依次下载两个 feed（间隔 20 秒），解析 Protobuf，保存原始 `.pb` 和 CSV，计算时间戳范围，并与本地 Static 的 `trips.txt` 比对 `trip_id` 和 `route_id`。
+**方法**：`check_realtime.py`（一次性实测脚本，2026-10-23 已删除，代码在 git 提交 `0546daf` 中可查）依次下载两个 feed（间隔 20 秒），解析 Protobuf，保存原始 `.pb` 和 CSV，计算时间戳范围，并与本地 Static 的 `trips.txt` 比对 `trip_id` 和 `route_id`。
 
 > [!NOTE]
 > 比对用的 Static 是 10 月 5 日前后下载的版本，不是每次实测当天重新下载的。这可能影响 10/11 的 `trip_id` 匹配率（V06）。

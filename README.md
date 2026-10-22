@@ -8,19 +8,19 @@ A Final Year Project (UTAR FICT) that turns Malaysia's open GTFS Realtime bus fe
 
 | Component | Status |
 |---|---|
-| GTFS Static archive (daily check, per-file content-addressed deduplication) | Live — GitHub Actions |
-| Weather forecast/warning archive (every 3 hours, temporary) | Live — GitHub Actions |
-| GTFS Realtime 24/7 collector | Prototype tested locally; cloud VM deployment pending |
+| Collector VM (AWS EC2): GTFS Realtime every 30 s per feed, daily `tar.zst` packs with manifests | Live since 2026-10-22 |
+| Collector VM: GTFS Static (daily), weather forecast (3-hourly) and warnings (hourly), Rapid Rail OD ridership (every version) | Live since 2026-10-23 |
+| Off-site backup of GTFS Static (and, temporarily, weather) | Live — GitHub Actions |
+| `bronze_sync` (VM to local copy with manifest verification) | In progress |
 | Lakehouse pipeline, dashboards, experiments | Not started (see roadmap in the design doc) |
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
-| `ingestion/` | Long-running collectors and deployment files |
-| `scripts/` | Archive jobs and one-off probes |
-| `.github/workflows/` | Scheduled archive jobs |
-| `data/raw/` | Raw landing data (realtime `.pb` files are not committed) |
+| `ingestion/` | Collectors, packing and sync jobs, and their systemd deployment files |
+| `.github/workflows/` | Off-site backup jobs |
+| `data/github-backup/` | Data committed by the GitHub Actions backup jobs |
 | `docs/fyp-design/` | Design document (current: v0.4) |
 | `docs/data-source/` | Data source profiling, evidence catalogue, official API docs |
 | `docs/evidence/` | Probe outputs cited as evidence |

@@ -7,7 +7,8 @@
 #   - There is no history API: a forecast revision that is not fetched is lost for good.
 #   - Records carry no publication time, so the fetch time stands in for it (E35).
 #
-# Layout (Malaysia time; <BRONZE_DIR> defaults to data/raw for the GitHub Actions archive):
+# Layout (Malaysia time; <BRONZE_DIR> defaults to data/bronze; the GitHub Actions backup sets it
+# to data/github-backup):
 #   <BRONZE_DIR>/<name>/date=<YYYY-MM-DD>/fetched_at=<HHMMSS>.json.gz   stored responses
 #   <BRONZE_DIR>/<name>/manifest.json                                   hash of the last stored response
 #   <BRONZE_DIR>/<name>/fetch_log.jsonl                                 one line per attempt
@@ -25,7 +26,7 @@ from pathlib import Path
 import requests
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = Path(os.environ.get("BRONZE_DIR", ROOT / "data" / "raw"))
+OUT_DIR = Path(os.environ.get("BRONZE_DIR", ROOT / "data" / "bronze"))
 # The trailing slash matters: without it the API answers 301.
 ENDPOINTS = {
     "weather_forecast": "https://api.data.gov.my/weather/forecast/",

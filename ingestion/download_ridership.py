@@ -9,7 +9,7 @@
 #     revised and the current-year file only appears after 1 January.
 #   - These files are on storage.data.gov.my (file storage), not the rate-limited OpenAPI.
 #
-# Layout (Malaysia time; <BRONZE_DIR> defaults to data/raw):
+# Layout (Malaysia time; <BRONZE_DIR> defaults to data/bronze):
 #   <BRONZE_DIR>/ridership_rapidrail/year=<YYYY>/downloaded=<YYYY-MM-DD>/fetched_at=<HHMMSS>.parquet
 #   <BRONZE_DIR>/ridership_rapidrail/year=<YYYY>/versions.jsonl   one line per check
 import hashlib
@@ -22,7 +22,7 @@ from pathlib import Path
 import requests
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = Path(os.environ.get("BRONZE_DIR", ROOT / "data" / "raw")) / "ridership_rapidrail"
+OUT_DIR = Path(os.environ.get("BRONZE_DIR", ROOT / "data" / "bronze")) / "ridership_rapidrail"
 URL = "https://storage.data.gov.my/transportation/rail/rapidrail_{year}_daily.parquet"
 MYT = timezone(timedelta(hours=8))
 

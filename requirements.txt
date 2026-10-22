@@ -1,4 +1,0 @@
-requests
-pandas
-protobuf
-gtfs-realtime-bindings

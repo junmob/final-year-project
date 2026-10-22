@@ -163,14 +163,21 @@ ssh fyp-collector 'df -h /'
 | `ingestion/requirements.txt` | VM 上要安装的 Python 套件：requests、gtfs-realtime-bindings、zstandard |
 | `ingestion/deploy/*.service`、`*.timer` | systemd 配置：每个程序怎么运行、什么时候运行（§7） |
 | `ingestion/deploy/install.sh` | 在一台全新 VM 上一键安装（§6.2） |
-| `scripts/check_realtime.py` | 一次性实测脚本（V06/V07 用过），不是长期采集 |
-| `.github/workflows/backup_gtfs.yml` | GitHub Actions 每天也检查一次 Static，作为**另一个地方的备份**，结果提交到仓库的 `data/raw/gtfs_static/` |
+| `ingestion/bronze_sync.py` | **在本地电脑运行**：把 VM 上的 Bronze 拉回本地并校验（§12.1） |
+| `.github/workflows/backup_gtfs.yml` | GitHub Actions 每天也检查一次 Static，作为**另一个地方的备份**，结果提交到仓库的 `data/github-backup/gtfs_static/` |
 | `.github/workflows/weather_archive.yml` | VM 上线前的临时天气归档；和 VM 并行几天核对后删除 |
-| `data/raw/gtfs_static/`、`data/raw/weather_*` | GitHub Actions 的存档（会提交到 git） |
+| `data/github-backup/` | GitHub Actions 备份任务存下的数据（会提交到 git） |
 
 所有采集脚本都读一个环境变量 `BRONZE_DIR`，决定数据存到哪里：
 - 在 VM 上：`BRONZE_DIR=/home/ubuntu/fyp-data/bronze`（systemd 配置里设定）；
-- 在 GitHub Actions 上：没有设定，默认存到仓库的 `data/raw/`。
+- 在 GitHub Actions 上：`BRONZE_DIR=data/github-backup`（workflow 里设定），结果提交到仓库；
+- 在本地直接运行脚本做测试时：没有设定，默认存到仓库的 `data/bronze/`，这个目录被 `.gitignore` 排除，不会进 git。
+
+> **几个"Bronze"目录的区别**：概念上都是"原始数据，原样保存"，区别只在**放在哪里、给谁用**：
+> - VM 的 `~/fyp-data/bronze/`：**正本**，采集程序写在这里；
+> - 本地的 `~/fyp-data/bronze/`：`bronze_sync` 拉回来的**副本**，布局和 VM 一模一样（在仓库外面，不进 git）；
+> - 仓库的 `data/github-backup/`：GitHub Actions 在另一个地方做的**备份**，只有 Static 和（暂时的）天气；
+> - 仓库的 `data/bronze/`：只是本地测试脚本时的默认位置，平时是空的。
 
 **同一份代码，靠一个环境变量适配不同环境**，这是常见的做法，避免复制出两份代码。
 
@@ -657,7 +664,7 @@ curl -sI "https://api.data.gov.my/gtfs-realtime/vehicle-position/prasarana?categ
 |---|---|---|
 | 采集器不是 `active` | `journalctl -u gtfs-rt-collector -n 50` | 代码出错（看 Traceback）；内存超过 300 MB 被系统杀掉 |
 | 大量 `timeout` 或 `network_error` | 同一时段的日志 | VM 网络或 API 那边有问题；如果持续很久，到 AWS 控制台看实例状态 |
-| 出现 `rate_limited`（429） | 是不是有别的程序也在请求 RT | 例如本地同时跑了 `check_realtime.py`。**同一时间只能有一个采集实例** |
+| 出现 `rate_limited`（429） | 是不是有别的程序也在请求 RT | 例如本地又启动了一个采集器。**同一时间只能有一个采集实例** |
 | timer 的 LAST 一直是空的 | `systemctl status fyp-xxx.timer` | timer 没有 enable；或 `.timer` 文件改了却没有 `daemon-reload` |
 | 磁盘快满了 | `du -sh ~/fyp-data/bronze/*` | 打包没有正常执行，零散文件越积越多 |
 | SSH 连不上 | §4.4 | 家里 IP 变了，或 VM 的公网 IP 变了 |
@@ -677,28 +684,50 @@ curl -sI "https://api.data.gov.my/gtfs-realtime/vehicle-position/prasarana?categ
 
 ## 12. 还没做、之后要做的采集策略
 
-### 12.1 `bronze_sync`：把 VM 的数据拉回本地（下一步）
+### 12.1 `bronze_sync`：把 VM 的数据拉回本地 ✅（2026-10-23 完成第一版）
 
-**是什么**：本地电脑开机后运行的一个同步任务（以后由 Airflow 定时触发），把 VM 上的 Bronze 数据拉回本地，校验无误后放进本地的 MinIO（对象存储），供 Spark 处理。
+> 这一节放在"还没做"一章里，是因为它只完成了第一版；最后一步"写进 MinIO"要等本地湖仓搭起来。
+
+**是什么**：在本地电脑运行的同步程序（`ingestion/bronze_sync.py`），把 VM 上的 Bronze 拉回本地 `~/fyp-data/bronze/`，然后逐项校验。以后会变成 Airflow 流程的第一个任务。
 
 **为什么是"本地去拉"，而不是"VM 推过来"？**你的电脑在家里的路由器后面（NAT），外面的机器连不进来，而且电脑经常关机。所以只能由本地主动连 VM 去拿（拉取式）。VM 永远不需要知道本地在哪里。
 
-**计划的步骤**：
+**为什么现在就做，而不是等湖仓建好**：在它之前，RT 数据**只存在 VM 一个地方**。VM 磁盘坏了、AWS 账户出问题，数据就全没了。同步之后，至少有两份。
 
-```
-① rsync 拉取：只拉"已打包的日子"（_packs/ 下的 tar.zst + manifest），
-   以及 Static blobs/snapshots、天气、客流、健康日志
-② 校验：对每个包重新计算 SHA-256，和 manifest 里的 pack_sha256 比对；
-   逐个解包比对文件指纹（和打包时的校验同理）
-③ 写进本地 MinIO：路径与 Bronze 结构保持一致
-④ 记录同步日志：哪些日期已同步、校验结果
-⑤ 云端清理：只有在本地校验通过之后才可以删除 VM 上的文件；
-   磁盘还够时，VM 上保留完整副本作为第二份备份
+**怎么用**（在 WSL 的仓库目录下）：
+
+```bash
+.venv/bin/python ingestion/bronze_sync.py                 # 拉取 + 校验
+.venv/bin/python ingestion/bronze_sync.py --verify-only   # 不拉取，只校验本地副本
 ```
 
-**今天的零散文件不同步**，因为还没打包、还在写入。要看"几乎实时"的数据，是另一个程序 `rt_relay` 的工作（§12.3）。
+建议每次开机做别的事之前先跑一次。本地关机一周后再开机，它会一次补拉这一周的数据，不会丢，因为 VM 一直在采集和保存。
 
-本地关机一周后再开机，`bronze_sync` 会一次补拉这一周的数据，不会丢，因为 VM 一直在采集和保存。
+**它做了什么**：
+
+```
+① rsync 拉取：除了"今天的零散 RT 文件"（还在写入、还没打包）和 .tmp 文件，其他全部拉回。
+   本地永远不删除文件，VM 上也不删除任何东西。
+② 校验：
+   - RT 打包：整个包的 SHA-256 要和 manifest 的 pack_sha256 一致；再解包逐个比对文件指纹和文件数。
+     通过的包记进 _sync/verified_packs.jsonl，下次不再重复解包（省时间）。
+   - Static：每个 blob 解压后的指纹要等于它的文件名；snapshots.jsonl 引用到的每个 blob 都要存在。
+   - 天气：fetch_log.jsonl 里每一个"changed"的文件都要存在，而且规范化后的指纹和日志一致。
+   - 客流：versions.jsonl 里每一个版本都要存在，而且指纹一致。
+③ 在 ~/fyp-data/_sync/sync_log.jsonl 写一行本次同步的摘要；有问题就逐条列出，退出码为 1。
+```
+
+**校验为什么有用**：传输中断、磁盘错误、或者有人误改了文件，都会让指纹对不上。测试时我故意改坏了一个压缩包的 1 个字节、删掉一个 Static blob，程序都抓出来了。这就是"对账"：用 VM 写下的清单（manifest）检查本地收到的东西。
+
+**rsync 的关键参数**：
+- `--exclude=/gtfs_rt/feed=*`：开头的 `/` 表示"从同步的根目录算起"，只排除 `gtfs_rt/` 下面以 `feed=` 开头的零散目录，不会误伤 `_packs/` 里同名的子目录；
+- `--partial-dir=.rsync-partial`：传到一半中断的文件先放在隐藏目录里，下次接着传，不会留下不完整的正式文件；
+- 没有 `--delete`：VM 上删掉的文件，本地照样保留。
+
+**还没做的部分**：
+- 写进本地 MinIO：等本地湖仓（Docker 的 `lake` profile）搭好后加上，路径保持和现在一样；
+- 用 Airflow 定时触发：等 Airflow 搭好后；
+- VM 端清理：现在磁盘够用，VM 保留完整副本作为第二份备份；磁盘紧张时，才删除"本地已校验通过"的旧打包。
 
 ### 12.2 监控与告警
 

@@ -1619,5 +1619,5 @@ docker compose --profile lake --profile stream --profile serve up -d  # 流处�
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
-| v0.4 修订 | 2026-10-23 | 采集：Static、天气、客流由 VM 上的 systemd timer 采集，客流改为云端归档每个版本；行政区人口移出范围（DQ29、E40 停用）。范围：RQ3 只做 Spark Structured Streaming（方案 B 移到 Future Work）；RQ4 改为 3 种系统、W1–W5；RQ1 增加留出验证、物理合理性检查和实地观测的安排；新增 stretch 目标 O7/RQ5（MCP + 本地 LLM）与 N7、§14.9；标题不变；记录 Azure for Students 不可行、演示方案待定 |
+| v0.4 修订 | 2026-10-23 | `bronze_sync` 第一版（rsync 拉取 + 按 manifest 校验，写入本地 `~/fyp-data/bronze/`；MinIO 与 Airflow 待湖仓建好）；删除一次性脚本 `check_realtime.py`；`data/raw/` 改名为 `data/github-backup/`。采集：Static、天气、客流由 VM 上的 systemd timer 采集，客流改为云端归档每个版本；行政区人口移出范围（DQ29、E40 停用）。范围：RQ3 只做 Spark Structured Streaming（方案 B 移到 Future Work）；RQ4 改为 3 种系统、W1–W5；RQ1 增加留出验证、物理合理性检查和实地观测的安排；新增 stretch 目标 O7/RQ5（MCP + 本地 LLM）与 N7、§14.9；标题不变；记录 Azure for Students 不可行、演示方案待定 |
 | v0.4 | 2026-10-20 | 合并 v0.2 与 v0.3；重新设计采集层（三档 VM 方案）；按 my-context 与 UTAR 校历重排路线图；新增与三份报告的映射、评估与实验设计、合并说明 |

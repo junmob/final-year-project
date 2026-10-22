@@ -9,8 +9,8 @@
 #     every repack.
 #   - Storing a full ZIP per change would add hundreds of MB per year to the repository.
 #
-# Layout (per category; <BRONZE_DIR> defaults to data/raw for the GitHub Actions backup and is
-# set to the Bronze directory on the collector VM):
+# Layout (per category; <BRONZE_DIR> defaults to data/bronze, is set to the Bronze directory on
+# the collector VM, and to data/github-backup by the GitHub Actions backup):
 #   <BRONZE_DIR>/gtfs_static/<category>/blobs/<sha256[:2]>/<sha256>.gz   file contents, stored once
 #   <BRONZE_DIR>/gtfs_static/<category>/snapshots.jsonl                  one line per daily check
 # Each snapshot records the hash of every file in the ZIP, so the exact contents of any
@@ -30,7 +30,7 @@ from pathlib import Path
 import requests
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = Path(os.environ.get("BRONZE_DIR", ROOT / "data" / "raw")) / "gtfs_static"
+OUT_DIR = Path(os.environ.get("BRONZE_DIR", ROOT / "data" / "bronze")) / "gtfs_static"
 URL = "https://api.data.gov.my/gtfs-static/prasarana/?category="  # trailing slash avoids a 301
 CATEGORIES = ["rapid-bus-kl", "rapid-bus-mrtfeeder", "rapid-rail-kl"]
 REQUEST_GAP_SECONDS = 20  # data-source summary §7.1: at least 20 s between requests

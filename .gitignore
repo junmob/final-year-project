@@ -1,7 +1,7 @@
-# Long-term Bronze data is too large for git; it lives on the collector VM and later in local MinIO.
-# The GitHub Actions archives under data/raw/gtfs_static and data/raw/weather_* ARE committed,
-# and so is the one-off probe evidence under docs/evidence/ (.pb / .csv); do not ignore those.
-data/raw/gtfs_realtime/
+# Bronze data is too large for git: it lives on the collector VM and in the local copy made by
+# bronze_sync (outside the repository). data/bronze/ is only the default for local test runs.
+# The GitHub Actions backup under data/github-backup/ IS committed, and so is the one-off probe
+# evidence under docs/evidence/ (.pb / .csv); do not ignore those.
 data/bronze/
 # python
 __pycache__/
