@@ -87,11 +87,15 @@
   - **本地同步 `bronze_sync` 第一版已完成（2026-10-23）**：在 WSL 仓库目录运行 `.venv/bin/python ingestion/bronze_sync.py`，拉到 `~/fyp-data/bronze/` 并按 manifest 校验，记录在 `~/fyp-data/_sync/`。建议每次开机先跑一次。写进 MinIO、Airflow 调度留到湖仓搭好后。
   - 还没做：`/metrics`、离线告警。
 
-# 6. 交接：下一步待办（2026-10-22）
+# 6. 交接：下一步待办（2026-10-23 更新）
 
-1. ✅ **部署 RT 采集器到 EC2**（2026-10-22 完成，见 §5）。下一步：观察首个完整日（10-22）和 10-23 00:30 的首次打包，看压缩率和断档；然后写本地 `bronze_sync`（rsync 拉打包文件 + 按 manifest 校验）。原待办：把 `ingestion/collect_gtfs_rt.py` 改成英文；输出路径改为设计书 §8.3.3 的 `bronze/gtfs_rt/...`；加每日 `tar.zst` 打包 + manifest；systemd 开机自启；开启 NTP。之后再把 Static、天气模块并入采集服务。
-2. **AWS 新手任务**：确认 "Launch an instance using EC2" 已完成（+20 美元）。Bedrock、Lambda、RDS 三项暂不做。
-3. ✅ **10/21 实测收尾**（2026-10-22 完成：结论在 summary §4.4，新增 E45；probe workflow 和旧 ZIP 已删除；23:00 那次失败，不补跑）。原待办：等最后一次（23:00 那次）结果提交后，把 V06/V07 结论写进 summary；删除 `.github/workflows/realtime_probe.yml`；清理 `data/raw/gtfs_static/` 下旧的平铺 ZIP 和 `manifest.json`（新格式已导入）。
-4. **导师**：给 Sir Wong 发消息（草稿在对话中，可再生成）；10-26 开学后跟进 Ms. Ashikin。
-5. **Proposal**：第 1 步，起草 Ch2 大纲（英文，写在 `reports/proposal/ch2-lit-review.md`），然后检索文献。
-6. 复学后申请 Azure for Students；**2027-04 上旬前**从 AWS 迁出。
+**采集部分已告一段落**：RT、Static、天气、客流都在 VM 上运行（§5）；`bronze_sync` 第一版完成。学习资料：`docs/learning/vm-collector-guide.md`；RQ 白话说明：`docs/fyp-design/rq-explained.md`。
+
+1. **学习**（下一步，在新 session 进行）：读 `docs/learning/vm-collector-guide.md`，做第 13 节的 10 道练习题；有疑问随时问。学完不需要回到旧 session。
+2. **Proposal Ch2**（学习之后，新 session，建议 `/model` 换成 Opus high）：先起草 Ch2 文献综述大纲（英文，`reports/proposal/ch2-lit-review.md`，按 `docs/context/proposal/guidelines.md` 与 `template.md`），再检索文献，记入 `reports/proposal/references.md`。依据设计书 §11.1、§11.5（文献检索清单）和 `rq-explained.md`；RQ1 要比较到站推断方法（含 HMM 地图匹配等），RQ5 为 stretch objective。
+3. **约 2026-10-26**：核对 VM 与 GitHub 的天气存档一致后，删除 `.github/workflows/weather_archive.yml`（`data/github-backup/weather_*` 保留为历史）。
+4. **每次开机**：运行 `.venv/bin/python ingestion/bronze_sync.py`，顺便按手册 §10.1 巡检 VM。
+5. **导师**：给 Sir Wong 发消息；10-26 开学后跟进 Ms. Ashikin。
+6. **AWS 新手任务**：EC2 那项的 20 美元额度没有到账，有空再看 Billing → Credits，不强求。
+7. **2027-04 前**：决定 AWS 到期后的 VM（Azure for Students 不可行；候选：Oracle 重试、小 VPS、只在本地采集），按手册 §12.6 迁移。演示方案也要在 FYP 1 presentation 前定下（设计书 §12.3）。
+8. 11 月中旬起，按路线图穿插 P1 湖仓基础（本地 Docker：MinIO、Iceberg、Polaris、Spark），届时给 `bronze_sync` 加上写入 MinIO 的步骤。
