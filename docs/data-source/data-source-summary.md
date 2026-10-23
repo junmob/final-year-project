@@ -375,6 +375,17 @@
 - **整个 ZIP 一个指纹会把伪版本当成新版本**。所以 Bronze 按文件去重存档（保留全部原始内容），Silver 层的 SCD2 再判断是否构成真正的新版本。
 - 新的脏点：**E43**（打包时混入 `__MACOSX/` 系统文件）、**E44**（内容不变但重新导出，产生伪版本：日期滚动、行顺序变化），见 §5.2。
 
+**2026-10-23 04:17 的检查：rapid-bus-kl 出现一次较大的真实更新**（VM 采集，`bronze_sync` 拉回后分析）：
+
+| 文件 | 变化 |
+|---|---|
+| `routes.txt` | 137 → 139 行：**新增 2 条路线**，`T4001`（T400B，Bandar Tun Razak & Taman Midah）和 `T5121`（T512B，Stesen MRT Putrajaya Sentral - Putrajaya） |
+| `stops.txt` | 4068 → 4106 行：新增 38 个站点 |
+| `trips.txt` / `frequencies.txt` | 2097 → 2121 / 2094 → 2118 行：两条新路线的 24 个班次模板及其频率窗口 |
+| `stop_times.txt` / `shapes.txt` | 新增 722 / 349 行 |
+
+所有变化都是**新增**，没有删除或修改已有的行。同一天 mrtfeeder 又只有 `calendar.txt` 变化（伪版本，E44），rapid-rail-kl 没有变化。这说明：① 新路线会随时上线，SCD2 和 `dim_route` 必须能处理"某天起才存在的路线"；② 如果没有每日检查，从 10-23 起两条新路线的 Realtime 数据会因为在 Static 里找不到而被判为匹配失败。
+
 > [!IMPORTANT]
 > ✅ **已自动化**：GitHub Actions 每天检查三个核心 Static（2026-10-21 起）。原先的要求是：**在采集服务上线之前，请每周手动下载一次三个核心 Static ZIP**（kl、mrtfeeder、rail），按日期命名保存。mrtfeeder 现行版本会在 11 月中过期，错过就无法再取得，之后也无法用它计算这段时间的准点率。
 
