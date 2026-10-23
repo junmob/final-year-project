@@ -63,6 +63,101 @@ practice/output/weather_forecast/date=<YYYY-MM-DD>/fetched_at=<HHMMSS>.json.gz
   - <https://docs.python.org/3/library/gzip.html>
 - **思考题**：目录名为什么写成 `date=2026-10-23`，而不是直接写 `2026-10-23`？（提示：搜一下 "Hive partitioning"，Spark 以后会用到。）
 
+#### 第 2 步的迷你文档
+
+建议拆成四小步来做，每做完一小步就运行一次：
+
+- **2a**：得到当前的马来西亚时间 `now` 并打印出来。
+- **2b**：用 `now` 拼出目录路径并打印出来。
+- **2c**：创建目录，把压缩后的内容写进文件。
+- **2d**：修改 `.gitignore`。
+
+##### ① `datetime`：模块和类同名
+
+`datetime` 既是一个**模块**的名字，也是这个模块里一个**类**的名字。`now()` 这类函数属于类，不属于模块。
+
+```python
+import datetime
+datetime.today()        # AttributeError: module 'datetime' has no attribute 'today'
+                        # (this is the module, it has no today())
+
+from datetime import datetime, timezone, timedelta   # take the class out of the module
+datetime.now()          # works
+```
+
+记住：在文件开头写 `from datetime import datetime, timezone, timedelta`，后面直接用 `datetime.now(...)`。
+
+##### ② 带时区的当前时间：`datetime.now(tz)`、`timezone`、`timedelta`
+
+- `timedelta(hours=9)` 表示"一段长度为 9 小时的时间"。
+- `timezone(timedelta(hours=9))` 表示"UTC+9 这个时区"，也就是日本时间。
+- `datetime.now(某个时区)` 返回那个时区的当前时间，并且时间本身记住了它属于哪个时区。
+
+```python
+from datetime import datetime, timezone, timedelta
+
+print(datetime.now())                 # 2026-10-24 01:48:31.291767         <- no timezone attached
+print(datetime.now(timezone.utc))     # 2026-10-23 17:48:31.291833+00:00   <- UTC
+JST = timezone(timedelta(hours=9))    # Japan, UTC+9
+print(datetime.now(JST))              # 2026-10-24 02:48:31.291869+09:00
+```
+
+**常见的坑**：`datetime.now()` 不传时区时，用的是电脑自己的时区。你的 WSL 设的是马来西亚时间，所以看起来没问题；但采集 VM 的系统时间是 UTC，同样的代码在 VM 上会慢 8 小时，文件也会存进错误的日期目录。所以一定要明确传入时区。马来西亚是 UTC+8，你照着上面 JST 的写法改一下即可。时区这种不会变的值，习惯上放在文件开头，名字全部大写（比如 `MYT`）。
+
+##### ③ 把时间格式化成字符串：`strftime` 或 f-string
+
+两种写法的结果完全一样：
+
+```python
+t = datetime.now(JST)
+t.strftime("%Y-%m-%d")    # '2026-10-24'
+t.strftime("%H%M%S")      # '024831'
+f"{t:%Y-%m-%d}"           # '2026-10-24'   <- the same format codes inside an f-string
+```
+
+常用的格式代码：`%Y` 是四位年份，`%m` 是两位月份，`%d` 是两位日期，`%H` 是 24 小时制的小时，`%M` 是分钟，`%S` 是秒。注意大小写：`%m` 是月份，`%M` 是分钟。
+
+##### ④ 路径：`pathlib.Path` 和 `/` 运算符
+
+`Path` 是"文件路径"类型。两个 `Path`（或者一个 `Path` 加一个字符串）之间用 `/` 连接，得到更长的路径，不用自己拼斜杠。
+
+```python
+from pathlib import Path
+
+p = Path("practice") / "output" / "demo" / f"date={t:%Y-%m-%d}"
+print(p)                  # practice/output/demo/date=2026-10-24
+p.mkdir(parents=True, exist_ok=True)   # create the directory
+```
+
+- `parents=True`：上层目录（`practice/output/`、`practice/output/demo/`）不存在时，一并创建。
+- `exist_ok=True`：目录已经存在时不报错。不加的话，第二次运行就会报 `FileExistsError`。
+
+在目录后面再 `/` 一个文件名，就得到文件路径，例如 `p / "fetched_at=024831.json.gz"`。
+
+##### ⑤ 原始字节与 gzip：`response.content`、`gzip.compress`、`Path.write_bytes`
+
+- `response.content` 是服务器发来的**原始字节**，类型是 `bytes`，样子是 `b'...'`。它和 `response.json()` 返回的 Python dict/list 不是一回事。第 2 步要存的是原始字节。
+- `gzip.compress(bytes)` 把字节压缩，返回压缩后的字节。
+- `path.write_bytes(bytes)` 把字节写进文件：文件不存在就新建，已经存在就覆盖。
+
+```python
+import gzip
+
+raw = b'{"a": 1}'
+z = gzip.compress(raw)
+print(z[:4])                 # b'\x1f\x8b\x08\x00'  <- every gzip file starts with \x1f\x8b
+print(gzip.decompress(z))    # b'{"a": 1}'          <- decompresses back to the original
+Path("practice/output/demo/test.json.gz").write_bytes(z)
+```
+
+在终端检查：`zcat practice/output/demo/test.json.gz` 会打印出解压后的内容。
+
+##### ⑥ `.gitignore`
+
+`.gitignore` 是仓库根目录下的一个文本文件，每一行是一个"不要纳入 git"的路径规则。末尾带 `/` 表示一个目录，例如现有的 `data/bronze/`。在文件末尾加一行你自己的规则，再用 `git status` 检查。
+
+**常见的坑**：`.gitignore` 只对**还没有被 git 跟踪**的文件生效。所以要在第一次 `git add` 输出文件**之前**就加好这条规则。
+
 ### 第 3 步：内容没变就不存（去重）
 
 在 `practice/output/weather_forecast/manifest.json` 里记住**上一次存下来的那份**内容的哈希值和文件路径。每次抓到新内容：
