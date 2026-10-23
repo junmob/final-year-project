@@ -18,3 +18,4 @@ venv/
 *.pem
 *.key
 *:Zone.Identifier
+practice/output/
