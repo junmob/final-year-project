@@ -172,6 +172,118 @@ Path("practice/output/demo/test.json.gz").write_bytes(z)
   - <https://docs.python.org/3/library/hashlib.html>
   - <https://docs.python.org/3/library/json.html>
 - **思考题**：为什么不直接对 `response.content` 的原始字节算哈希？为什么要 `sort_keys`？
+- **额外约束（顺序很重要）**：必须**先存好 `.json.gz` 文件，再更新 manifest**。想一想：如果顺序反过来，更新完 manifest、还没来得及存文件程序就崩溃了，下一次运行会发生什么？
+
+#### 第 3 步的迷你文档
+
+建议拆成四小步，每做完一小步就运行一次：
+
+- **3a**：算出这次内容的哈希，打印出来。连续跑两次（间隔一分钟），两次的哈希应该一样（如果 MET 刚好在这一分钟内更新了预报，哈希会不一样，这是正常的）。
+- **3b**：存完 `.json.gz` 之后，把哈希和文件路径写进 `manifest.json`。用 `cat` 查看 manifest 的内容。
+- **3c**：在存文件**之前**读取 manifest，和这次的哈希比较。相同就打印 `unchanged` 并且不存文件；不同就照常存文件、更新 manifest。
+- **3d**：删掉 manifest 再运行，确认没有报错，而且会存一个新文件。
+
+##### ① 哈希：`hashlib.sha256(...).hexdigest()`
+
+哈希函数把任意长度的数据变成一串固定长度的"指纹"。SHA-256 的指纹是 64 个十六进制字符。它有两个特点：
+- 内容完全相同，指纹一定相同。
+- 内容哪怕只差一个字符，指纹也会完全不同。
+
+所以比较两份约 0.9 MB 的数据是否一样，只要比较两个 64 字符的指纹就可以了，manifest 里也只需要存这个指纹。
+
+```python
+import hashlib
+
+s = "hello"
+b = s.encode()                       # str -> bytes
+print(b)                             # b'hello'
+print(hashlib.sha256(b).hexdigest()) # 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+
+hashlib.sha256(s)                    # TypeError: Strings must be encoded before hashing
+```
+
+**常见的坑**：`sha256()` 只接受**字节**（`bytes`），不接受字符串（`str`）。字符串要先用 `.encode()` 转成字节。
+
+##### ② 把数据变回字符串：`json.dumps` 和它的 `sort_keys` 参数
+
+`json.loads` 把 JSON 文本变成 Python 的 dict 或 list；`json.dumps` 反过来，把 dict 或 list 变成 JSON 文本（`str`）。
+
+```python
+import json
+
+x = {"b": 2, "a": 1}
+y = {"a": 1, "b": 2}
+print(x == y)                         # True   <- same content to Python
+print(json.dumps(x))                  # {"b": 2, "a": 1}
+print(json.dumps(y))                  # {"a": 1, "b": 2}   <- different text!
+print(json.dumps(x, sort_keys=True))  # {"a": 1, "b": 2}
+print(json.dumps(y, sort_keys=True))  # {"a": 1, "b": 2}   <- now identical text
+
+# The first 16 characters of each hash:
+#   json.dumps(x)                -> d5b8aed265256c89
+#   json.dumps(y)                -> d8497d9d82770a70   (different)
+#   json.dumps(x, sort_keys=True) -> d8497d9d82770a70
+#   json.dumps(y, sort_keys=True) -> d8497d9d82770a70   (same)
+```
+
+`ensure_ascii` 参数：默认情况下，非英文字符会被写成 `–` 这种转义形式；加上 `ensure_ascii=False` 就会保留原字符。用来算哈希时两种都可以，只要每次都用同一种写法。但写给人看的文件（比如 manifest）建议加上，更好读。
+
+```python
+json.dumps({"name": "Kuala Terengganu – Pantai"})
+# {"name": "Kuala Terengganu – Pantai"}
+json.dumps({"name": "Kuala Terengganu – Pantai"}, ensure_ascii=False)
+# {"name": "Kuala Terengganu – Pantai"}
+```
+
+所以算哈希的完整过程是：解析后的数据 → `json.dumps(..., sort_keys=True)` → `.encode()` → `sha256` → `.hexdigest()`。
+
+##### ③ 读写小的文本文件：`Path.exists`、`write_text`、`read_text`、`json.loads`
+
+```python
+from pathlib import Path
+import json
+
+m = Path("demo_out") / "state.json"
+print(m.exists())                                         # False  <- first time
+m.write_text(json.dumps({"sha256": "ab12", "file": "x.gz"}, indent=2))
+print(m.read_text())
+# {
+#   "sha256": "ab12",
+#   "file": "x.gz"
+# }
+info = json.loads(m.read_text())                          # text -> dict
+print(info["file"])                                       # x.gz
+```
+
+- `write_text(字符串)`：把字符串写进文件，文件已经存在就覆盖。
+- `read_text()`：把整个文件读成一个字符串。
+- `indent=2`：输出时换行并缩进 2 个空格，方便人看。只影响格式，不影响内容。
+
+##### ④ 安全地取 dict 的值：`dict.get`
+
+第一次运行时没有 manifest。一种常见写法是：文件不存在时用一个空 dict `{}` 代替。但空 dict 里没有 `"sha256"` 这个 key，直接用方括号取会报错：
+
+```python
+empty = {}
+empty["sha256"]          # KeyError: 'sha256'
+print(empty.get("sha256"))   # None   <- .get returns None instead of crashing
+```
+
+一个哈希值永远不会等于 `None`，所以"没有 manifest"自然会被当成"内容变了"。这样第一次运行不需要单独写一个分支来处理。
+
+##### ⑤ 相对路径：`Path.relative_to`
+
+manifest 里不要存完整的绝对路径。完整路径里包含你电脑上的用户目录，换一台机器（比如采集 VM）就不对了。只存相对于 `weather_forecast/` 的那一段：
+
+```python
+from pathlib import Path
+
+full = Path("/home/u/practice/output/weather_warning/date=2026-10-24/fetched_at=101500.json.gz")
+base = Path("/home/u/practice/output/weather_warning")
+print(full.relative_to(base))          # date=2026-10-24/fetched_at=101500.json.gz
+```
+
+`relative_to` 返回的还是 `Path`。要放进 `json.dumps`，先用 `str(...)` 转成字符串，否则会报 `TypeError: Object of type PosixPath is not JSON serializable`。
 
 ### 第 4 步：每次尝试都记一行日志
 
