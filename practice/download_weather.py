@@ -1,9 +1,12 @@
 import requests
 
-# Set timeout to 60 seconds, 60 seconds is not too long for a request, but it is long enough to avod timeout errors for slow connections or large responses.
-# Timeout too big can cause ...
-# Timeout too small can cause ...
-# Timeout is not set can cause ...
+# Timeout = seconds of silence from the server before giving up (not the total download time).
+# - Not set: if the server never answers, the script hangs forever, nothing is logged, the code
+#   below never runs, and the next scheduled run cannot start.
+# - Too small: a slow but working server is treated as a failure, and that forecast version is
+#   lost for good.
+# - Too big: only a longer wait when the server is really down; nobody waits on this background
+#   job, so 60 s is safe as long as it stays far below the run interval (3 h).
 response = requests.get('https://api.data.gov.my/weather/forecast/', timeout=60)
 
 data = response.json()
