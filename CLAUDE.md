@@ -19,6 +19,9 @@
 
 ## Learning Guides (the student must understand every module)
 - The student is learning while building and must be able to explain every part in reports, presentations and interviews. Code that works but is not understood does not count as done.
+- **Working mode (agreed 2026-10-23): the student writes the core code; Claude acts as tech lead.**
+  - Student writes (from Claude's tickets): Spark Bronze → Silver jobs, DQ rules, dbt models, Airflow DAGs, the arrival-inference algorithm, KPI SQL, and the pytest tests for the collectors. For these, Claude writes the ticket (goal, inputs/outputs, v0.4 constraints, acceptance criteria), answers library questions with small standalone examples plus official docs links, gives graded hints when asked (direction → steps → key lines → full answer only on explicit request), and reviews the diff with `file:line` comments. Claude does not write or edit the student's task code.
+  - Claude writes, student reviews and must be able to explain every line: infrastructure and boilerplate (docker compose, deploy scripts, CI workflow YAML, service configs).
 - **After each module is finished** (e.g. collector VM, bronze_sync, CI, local lakehouse, Spark jobs, dbt models, Airflow DAGs, streaming, dashboards, RQ experiments), remind the student and write or update a teaching guide in `docs/learning/` before moving on. Write it in Chinese, for a beginner: what each folder and file is for, the general logic and then the specifics, why each design choice was made, how to deploy, run and check it, common problems, what is not done yet, and hands-on exercises.
 - Keep `docs/learning/README.md` as the index of guides, in recommended reading order.
 - When explaining concepts in chat, assume no prior exposure: use plain language and concrete examples, and avoid unexplained jargon.
