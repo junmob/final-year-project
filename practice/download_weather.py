@@ -33,15 +33,21 @@ data = res.json()  # parse once; also checks that the body is valid JSON
 
 now = datetime.now(MYT)
 
-# "date=<value>" is Hive-style partitioning, so Spark can read the date from the folder name.
-output_dir = Path("practice") / "output" / "weather_forecast" / f"date={now:%Y-%m-%d}"
-output_dir.mkdir(parents=True, exist_ok=True)
+# Folder named "date=<value>" (Hive-style partitioning): Spark turns it into a "date" column and
+# can skip other days' folders when a query filters on date. The records carry no publication
+# time, so this folder (and the file name) is the only place the fetch time is kept.
+# The file name "fetched_at=..." is NOT a partition (only folders are); it is read from the path.
+OUT_DIR = Path(__file__).resolve().parent / "output"
+out_dir = OUT_DIR / "weather_forecast" / f"date={now:%Y-%m-%d}"
+out_dir.mkdir(parents=True, exist_ok=True)
 
 raw = res.content  # the raw bytes from the server, stored as-is (not the parsed data)
 compressed = gzip.compress(raw)
 
-file_path = output_dir / f"fetched_at={now:%H%M%S}.json.gz"
+file_path = out_dir / f"fetched_at={now:%H%M%S}.json.gz"
 file_path.write_bytes(compressed)
+
+print(f'saved {file_path} ({len(compressed)/1024:.0f} KB)')
 
 # ==========================================================
 
