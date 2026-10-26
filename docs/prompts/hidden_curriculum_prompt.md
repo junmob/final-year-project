@@ -18,7 +18,7 @@
 - 项目方向、数据源、架构设计都是 AI 主导完成的：AI 总结了数据源（包括坑点、脏点），又基于总结设计了架构。当前设计基线是 v0.4。
 - collector VM、ingestion、bronze_sync、CI 等基础部分已经由 AI 写好。
 - 现行工作模式（见 `CLAUDE.md`）：我写核心代码，AI 当 tech lead 写 ticket、给提示、review。
-- 我在 `practice` 分支做了一个练习 ticket（`practice/tickets/T01-weather-downloader.md`，只在 practice 分支上，用 `git show practice:<path>` 读）。
+- 我目前的学习方式：在 `practice` 分支开了一个 `practice/` 文件夹，AI 在里面写 ticket，我跟着做。已经做了一个练习 ticket（`practice/tickets/T01-weather-downloader.md` 和 `practice/download_weather.py`）。这些文件只在 practice 分支上，main 上看不到，请用 `git show practice:<path>` 和 `git log practice` 读。
 - 我读过 AI 写的数据源总结，但只记得大概，具体坑点不记得。
 
 ## 我的想法（请先判断它是否合理）
@@ -46,6 +46,8 @@
 
 ## 需要你自己做决定的问题
 
+- 现在的 practice 方式（practice 分支 + `practice/` 文件夹 + T01）不是固定的。你可以保留、调整，或者整个换掉（包括分支怎么安排、练习放在哪里、T01 是否继续）。请说明怎么处理已有的 practice 内容。
+- 怎么教我：我说了"撞墙后我不问它就不说"，但我不是老师，不知道怎样教才能学得最深刻。比如也许应该在任务里给一点小提示（这一步可以这么做，做完后可能会出现什么问题），也许不应该。撞墙前、撞墙时、撞墙后分别给多少提示、用什么方式引导，由你按学习效果来决定，不必照我原来的说法。
 - 已经由 AI 写好的 ingestion 代码不要改。要不要让我另外把 ingestion 的关键部分重新走一遍，由你根据时间判断。
 - 过程怎么记录和对外展示：我听说过 GitHub Issues + PR、ticket（据说大公司的 ticket 比 Issues 更详细）、ADR、devlog 等做法。我只是提意见，没有偏好要你照做。请评估后自己决定用什么、放在哪里，以及最终 repo 里是否保留早期版本的代码。
 - 哪些墙值得让我撞、哪些不值得（比如环境配置这类只耗时间、学不到核心能力的问题）。
