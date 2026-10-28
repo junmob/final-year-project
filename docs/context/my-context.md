@@ -1,12 +1,12 @@
 # 1. 我的最新个人与环境决策（用来更新待定项）
-1. **本地硬件配置**：我的电脑是 **16GB RAM**。这符合 `docs/fyp-design/archive/fyp_project_design_v0.3.md`（现已由 v0.4 取代） 中 Docker Compose 分 profile 启动的规划（开发时开 `batch` + `serve` 约 7-9GB，可以跑得动）。
+1. **本地硬件配置**：我的电脑是 **16GB RAM**。这符合 `docs/fyp-design/archive/fyp_project_design_v0.3.md`（现已由 v0.5 取代） 中 Docker Compose 分 profile 启动的规划（开发时开 `batch` + `serve` 约 7-9GB，可以跑得动）。
 2. **数据采集运行环境**：我的个人电脑**不能 24 小时开机**。因此，24小时不间断的采集服务（`ingest` profile）我决定后续部署在**免费的云端常驻虚拟机（如 GCP Always Free `e2-micro` 或 Oracle Cloud Free Tier）**上。
 3. **当前阶段重心（2026-10-20 更新）**：采集代码**已经开始写，不再是"先不写"**。当前状态：
    - **GTFS Static 每日检查已上线**（2026-10-21 起）：`ingestion/download_gtfs_static.py`（2026-10-23 从 `scripts/` 移来）+ GitHub Actions（`.github/workflows/backup_gtfs.yml`，每天 04:17 MYT），按文件、按内容哈希去重，存到 `data/github-backup/gtfs_static/<category>/`（原 `data/raw/`）（`blobs/` + `snapshots.jsonl`）。之前是每周一次、整包指纹，已发现会漏掉真实修改并产生伪版本（summary §3.7.1）。
    - **GTFS Realtime 采集脚本已写好并本地测试通过**：`ingestion/collect_gtfs_rt.py`（每 30 秒、两个 feed 错开 15 秒、只存原始 `.pb`、写健康日志）+ systemd 服务文件。**尚未部署**：云端 VM 选定 Oracle Cloud Always Free（新加坡），因该区域暂无容量（A1.Flex 和 E2.1.Micro 均 Out of capacity），正在每天重试；备选 GCP e2-micro。
    - **V06/V07 实测**：由一次性 workflow（`realtime_probe.yml`）在 2026-10-21（周三）马来西亚时间 08:00/13:00/18:00/23:00 自动运行，证据存 `docs/evidence/realtime_probe/`。
    - **仍待完成**：设计书定稿（本文件第 1 点之后的任务）、Proposal 报告重写、采集服务上线。设计书不应再写"先不写采集代码"。现有 `ingestion/` 原型作为可行性证据，并按设计书 v0.4 §8.3 演进为完整的采集服务（2026-10-20 确认）。
-   - **设计书现状**：`docs/fyp-design/fyp_project_design_v0.4.md` 是当前有效基线，取代 v0.2、v0.3，后续会继续迭代。
+   - **设计书现状**：`docs/fyp-design/fyp_project_design_v0.5.md` 是当前有效基线（2026-10-27），取代 v0.2–v0.4（均在 `archive/`），后续按文献关口 G1–G3 继续迭代。
    - **天气临时归档**：P0 上线前由 `.github/workflows/weather_archive.yml` 每 3 小时归档到 `data/raw/weather_*`（2026-10-23 改名为 `data/github-backup/`）。
 
 ---
@@ -89,17 +89,19 @@
   - **本地同步 `bronze_sync` 第一版已完成（2026-10-23）**：在 WSL 仓库目录运行 `.venv/bin/python ingestion/bronze_sync.py`，拉到 `~/fyp-data/bronze/` 并按 manifest 校验，记录在 `~/fyp-data/_sync/`。建议每次开机先跑一次。写进 MinIO、Airflow 调度留到湖仓搭好后。
   - 还没做：`/metrics`、离线告警。
 
-# 6. 交接：下一步待办（2026-10-23 更新）
+# 6. 交接：下一步待办（2026-10-27 更新）
 
 **采集部分已告一段落**：RT、Static、天气、客流都在 VM 上运行（§5）；`bronze_sync` 第一版完成。学习资料：`docs/learning/vm-collector-guide.md`；RQ 白话说明：`docs/fyp-design/rq-explained.md`。
 
-1. **学习**（下一步，在新 session 进行）：读 `docs/learning/vm-collector-guide.md`，做第 13 节的 10 道练习题；有疑问随时问。学完不需要回到旧 session。
-2. **Proposal Ch2**（学习之后，新 session，建议 `/model` 换成 Opus high）：先起草 Ch2 文献综述大纲（英文，`reports/proposal/ch2-lit-review.md`，按 `docs/context/proposal/guidelines.md` 与 `template.md`），再检索文献，记入 `reports/proposal/references.md`。依据设计书 §11.1、§11.5（文献检索清单）和 `rq-explained.md`；RQ1 要比较到站推断方法（含 HMM 地图匹配等），RQ5 为 stretch objective。
-3. **约 2026-10-26**：核对 VM 与 GitHub 的天气存档一致后，删除 `.github/workflows/weather_archive.yml`（`data/github-backup/weather_*` 保留为历史）。
+**2026-10-27 起按学习路线推进**：规则见 `docs/learning/curriculum.md`，ticket 索引与分支流程见 `docs/tickets/README.md`，设计书升为 v0.5（范围、时间、关口、流程调整，架构不变）。我亲手写核心代码；Claude 写 ticket、提示、review、基础设施，起草报告、工程日志和 ADR。时间按每天约 4 小时估算。
+
+1. **当前 ticket**：T01（`practice` 分支）第 3 步起；**11-06 截止**，收尾后打 tag `practice-t01-done`，不合并。之后是 S0 的采集器测试（T02、T03）。
+2. **Proposal**：Claude 在 S1 期间检索文献、起草 Ch2（英文，`reports/proposal/ch2-lit-review.md`，按 `docs/context/proposal/guidelines.md` 与 `template.md`，参考文献记入 `reports/proposal/references.md`）和 Ch1；G1（约 12-20）后定稿其余章节；我读完自己改；**目标 2027-01-15 前提交**。依据设计书 §11.1、§11.5 和 `rq-explained.md`；RQ5 写成默认 Future Work 的 stretch。
+3. **`weather_archive.yml`**：原计划核对 VM 与 GitHub 的天气存档一致后删除（`data/github-backup/weather_*` 保留为历史）。截至 10-27 仍在运行，待确认后删除。
 4. **每次开机**：运行 `.venv/bin/python ingestion/bronze_sync.py`，顺便按手册 §10.1 巡检 VM。
-5. **导师**：给 Sir Wong 发消息；10-26 开学后跟进 Ms. Ashikin。
+5. **导师**：给 Sir Wong 发消息；跟进 Ms. Ashikin。
 6. **AWS 新手任务**：EC2 那项的 20 美元额度没有到账，有空再看 Billing → Credits，不强求。
-7. **2027-04 前**：决定 AWS 到期后的 VM（Azure for Students 不可行；候选：Oracle 重试、小 VPS、只在本地采集），按手册 §12.6 迁移。演示方案也要在 FYP 1 presentation 前定下（设计书 §12.3）。
-8. **采集器 CI 与部署脚本**（2026-11，和 Proposal 穿插）：pytest 单元测试 + ruff + GitHub Actions 工作流 + `deploy.sh`；做完后写 `docs/learning/ci-guide.md`。
-9. **Git tag**：`v0.1-collector` 已打（2026-10-23）；之后的计划：`v0.2-lakehouse`（M1）、`v1.0-mvp`（M3）、`v1.1-fyp1`、`v1.2-portfolio`（05-31）、`v2.0-fyp2`；采集代码改变数据格式时打小版本。
-10. 11 月中旬起，按路线图穿插 P1 湖仓基础（本地 Docker：MinIO、Iceberg、Polaris、Spark），届时给 `bronze_sync` 加上写入 MinIO 的步骤。
+7. **2027-04 前**（S3 期间）：决定 AWS 到期后的 VM（Azure for Students 不可行；候选：Oracle 重试、小 VPS、只在本地采集），按手册 §12.6 迁移，作为切换演练。演示方案也要在 FYP 1 presentation 前定下（设计书 §12.3）。
+8. **采集器 CI 与部署脚本**（S0，10-28 → 11-15）：测试由我写（T02、T03），CI workflow 与 `deploy.sh` 由 Claude 写；做完后 Claude 写 `docs/learning/ci-guide.md`。
+9. **Git tag**：`v0.1-collector` 已打（2026-10-23）；之后：`practice-t01-done`（T01）、`v0.2-lakehouse`（M1，2027-01-31）、`v1.0-mvp`（M3，03-21）、`v1.1-fyp1`、`v1.2-portfolio`（05-31）、`v2.0-fyp2`；另外每个阶段结束打一个 tag；采集代码改变数据格式时打小版本。
+10. **S1（11-16 起）**：先用 Python 认识数据；**S2（12-21 起）** 才进入本地湖仓（Docker：MinIO、Iceberg、Spark），届时给 `bronze_sync` 加上写入 MinIO 的步骤。

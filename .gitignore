@@ -18,3 +18,4 @@ venv/
 *.pem
 *.key
 *:Zone.Identifier
+.claude/settings.local.json
