@@ -21,7 +21,10 @@ A Final Year Project (UTAR FICT) that turns Malaysia's open GTFS Realtime bus fe
 | `ingestion/` | Collectors, packing and sync jobs, and their systemd deployment files |
 | `.github/workflows/` | Off-site backup jobs |
 | `data/github-backup/` | Data committed by the GitHub Actions backup jobs |
-| `docs/fyp-design/` | Design document (current: v0.4) |
+| `docs/fyp-design/` | Design document (current: v0.5) |
+| `docs/engineering-log/` | How each module evolved: what a version could not do, how it showed up, what the next version changed |
+| `docs/adr/` | Architecture Decision Records |
+| `docs/tickets/`, `docs/learning/` | Work tickets and learning guides (internal, in Chinese) |
 | `docs/data-source/` | Data source profiling, evidence catalogue, official API docs |
 | `docs/evidence/` | Probe outputs cited as evidence |
 | `docs/context/` | University guidelines, templates and academic calendar |
