@@ -95,7 +95,7 @@
 
 **2026-10-27 起按学习路线推进**：规则见 `docs/learning/curriculum.md`，ticket 索引与分支流程见 `docs/tickets/README.md`，设计书升为 v0.5（范围、时间、关口、流程调整，架构不变）。我亲手写核心代码；Claude 写 ticket、提示、review、基础设施，起草报告、工程日志和 ADR。时间按每天约 4 小时估算。
 
-1. **当前 ticket**：T01（`practice` 分支）第 3 步起；**11-06 截止**，收尾后打 tag `practice-t01-done`，不合并。之后是 S0 的采集器测试（T02、T03）。
+1. **当前 ticket**：T01（`t01-weather-downloader` 分支）第 3 步起；**11-06 截止**，收尾后打 tag `t01-done`，不合并。之后是 S0 的采集器测试（T02、T03）。
 2. **Proposal**：Claude 在 S1 期间检索文献、起草 Ch2（英文，`reports/proposal/ch2-lit-review.md`，按 `docs/context/proposal/guidelines.md` 与 `template.md`，参考文献记入 `reports/proposal/references.md`）和 Ch1；G1（约 12-20）后定稿其余章节；我读完自己改；**目标 2027-01-15 前提交**。依据设计书 §11.1、§11.5 和 `rq-explained.md`；RQ5 写成默认 Future Work 的 stretch。
 3. **`weather_archive.yml`**：原计划核对 VM 与 GitHub 的天气存档一致后删除（`data/github-backup/weather_*` 保留为历史）。截至 10-27 仍在运行，待确认后删除。
 4. **每次开机**：运行 `.venv/bin/python ingestion/bronze_sync.py`，顺便按手册 §10.1 巡检 VM。
@@ -103,5 +103,5 @@
 6. **AWS 新手任务**：EC2 那项的 20 美元额度没有到账，有空再看 Billing → Credits，不强求。
 7. **2027-04 前**（S3 期间）：决定 AWS 到期后的 VM（Azure for Students 不可行；候选：Oracle 重试、小 VPS、只在本地采集），按手册 §12.6 迁移，作为切换演练。演示方案也要在 FYP 1 presentation 前定下（设计书 §12.3）。
 8. **采集器 CI 与部署脚本**（S0，10-28 → 11-15）：测试由我写（T02、T03），CI workflow 与 `deploy.sh` 由 Claude 写；做完后 Claude 写 `docs/learning/ci-guide.md`。
-9. **Git tag**：`v0.1-collector` 已打（2026-10-23）；之后：`practice-t01-done`（T01）、`v0.2-lakehouse`（M1，2027-01-31）、`v1.0-mvp`（M3，03-21）、`v1.1-fyp1`、`v1.2-portfolio`（05-31）、`v2.0-fyp2`；另外每个阶段结束打一个 tag；采集代码改变数据格式时打小版本。
+9. **Git tag**：`v0.1-collector` 已打（2026-10-23）；之后：`t01-done`（T01）、`v0.2-lakehouse`（M1，2027-01-31）、`v1.0-mvp`（M3，03-21）、`v1.1-fyp1`、`v1.2-portfolio`（05-31）、`v2.0-fyp2`；另外每个阶段结束打一个 tag；采集代码改变数据格式时打小版本。
 10. **S1（11-16 起）**：先用 Python 认识数据；**S2（12-21 起）** 才进入本地湖仓（Docker：MinIO、Iceberg、Spark），届时给 `bronze_sync` 加上写入 MinIO 的步骤。

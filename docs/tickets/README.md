@@ -7,9 +7,14 @@
 
 | ID | 标题 | 阶段 | 状态 | 分支 / PR |
 |---|---|---|---|---|
-| T01 | 从零写一个天气预报归档脚本（练习） | S0 | 进行中（第 3 步） | `practice` 分支（不合并），文件 `practice/tickets/T01-weather-downloader.md` |
+| [T01](T01-weather-downloader.md) | 从零写一个天气预报归档脚本（练习） | S0 | 进行中（第 3 步） | `t01-weather-downloader`（练习，不合并） |
 
 状态：未发出 → 进行中 → review 中 → 已合并 / 已归档。
+
+## T01 的特殊之处
+
+- T01 是练习：重写一个已经在运行的脚本（`ingestion/download_weather.py`），所以**不开 PR、不合并**，代码直接 commit、push 到 `t01-weather-downloader` 分支，放在分支里的 `practice/` 文件夹。
+- T01 进行中补充的迷你文档提交在 `t01-weather-downloader` 分支上；T01 结束时，Claude 把最终版同步到 main 的 `docs/tickets/T01-weather-downloader.md`。
 
 ## T01 收尾（截止 11-06）
 
@@ -17,11 +22,11 @@
 2. Claude 出几道对比题，你在聊天里回答。
 3. 打 tag 并推送，标记完成：
    ```bash
-   git switch practice
-   git tag practice-t01-done
-   git push origin practice-t01-done
+   git switch t01-weather-downloader
+   git tag t01-done
+   git push origin t01-done
    ```
-4. `practice` 分支保留、不删、不合并（它和 `ingestion/download_weather.py` 做的是同一件事，合并后 main 里会有两份）。
+4. 分支保留、不删、不合并（它和 `ingestion/download_weather.py` 做的是同一件事，合并后 main 里会有两份）。
 5. 11-06 还没做完：第 7 步改为读懂 `ingestion/download_weather.py` 里对应的代码并讲给 Claude 听。
 
 ## 每个 ticket 的分支流程（从 T02 开始）
