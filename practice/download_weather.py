@@ -70,11 +70,22 @@ else:
     # can skip other days' folders when a query filters on date. The records carry no publication
     # time, so this folder (and the file name) is the only place the fetch time is kept.
     # The file name "fetched_at=..." is NOT a partition (only folders are); it is read from the path.
+    # The double extension ".json.gz" names both layers: gzip on the outside, JSON on the inside.
+    # gzip-aware tools strip only the last one (gunzip gives "....json", Spark and pandas pick the
+    # codec from ".gz" and still see JSON), so nobody has to open the file to know what it holds.
     out_dir = OUT_DIR / f"date={fetched_at:%Y-%m-%d}"
     out_dir.mkdir(parents=True, exist_ok=True)
     gz_path = out_dir / f"fetched_at={fetched_at:%H%M%S}.json.gz"
 
     # Save the raw response as gzip
+    # - Raw, not parsed: Bronze keeps exactly what the server sent, so it can be parsed again if
+    #   the parsing logic changes later. Turning it into a table (e.g. Parquet) is Silver's job.
+    # - Compressed: the JSON repeats the same keys in every record, so it shrinks about 47x
+    #   (about 910 KB -> 19 KB on 2026-10-28). At up to 8 saves a day that is about 55 MB a year
+    #   instead of about 2.6 GB.
+    # - gzip, not bz2/xz/zstd: it is in the standard library, and every tool in this project reads
+    #   it without extra setup (zcat, pandas, Spark, DuckDB). bz2 is smaller here (about 12 KB) but
+    #   slower to read; at 19 KB per file the difference does not matter.
     raw = response.content  # the raw bytes from the server, stored as-is (not the parsed data)
     compressed = gzip.compress(raw)
 
