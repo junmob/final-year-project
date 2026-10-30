@@ -7,7 +7,7 @@
 
 | ID | 标题 | 阶段 | 状态 | 分支 / PR |
 |---|---|---|---|---|
-| [T01](T01-weather-downloader.md) | 从零写一个天气预报归档脚本（练习） | S0 | 进行中（第 3 步） | `t01-weather-downloader`（练习，不合并） |
+| [T01](T01-weather-downloader.md) | 从零写一个天气预报归档脚本（练习） | S0 | 进行中（第 4 步） | `t01-weather-downloader`（练习，不合并） |
 
 状态：未发出 → 进行中 → review 中 → 已合并 / 已归档。
 

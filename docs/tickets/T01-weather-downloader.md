@@ -303,6 +303,106 @@ print(full.relative_to(base))          # date=2026-10-24/fetched_at=101500.json.
 - **文档**：<https://jsonlines.org/>
 - **思考题**：为什么用 jsonl（一行一个 JSON），而不是把所有记录放进一个大的 JSON 数组？
 
+#### 第 4 步的迷你文档
+
+建议拆成四小步，每做完一小步就运行一次（同一个接口一分钟最多跑一次）：
+
+- **4a**：先不写文件。把这次运行的 6 个字段放进一个 dict，用 `print(json.dumps(...))` 打印出来，检查字段名和值对不对。
+- **4b**：把这一行追加写进 `fetch_log.jsonl`，用 `cat` 查看。
+- **4c**：删掉 `fetch_log.jsonl`，从头再跑 3 次，用 `wc -l` 数行数。
+- **4d**：逐行用 `json.loads` 解析一遍（见 ②），确认每一行都能解析。
+
+这一步运行时只会出现 `changed` 和 `unchanged`。`failed` 要等第 5 步加上失败处理以后才会出现：现在请求一失败，程序就直接崩溃退出了，走不到写日志的那一行。
+
+##### ① 追加写入：`open(path, "a")` 和 `with`
+
+```python
+from pathlib import Path
+
+p = Path("demo_out") / "notes.txt"
+p.parent.mkdir(parents=True, exist_ok=True)
+with open(p, "a", encoding="utf-8") as f:
+    f.write("first\n")
+with open(p, "a", encoding="utf-8") as f:
+    f.write("second\n")
+print(p.read_text(encoding="utf-8"))
+# first
+# second
+```
+
+| 模式 | 打开时 | 写在哪里 | 文件不存在时 |
+|---|---|---|---|
+| `"w"` | 先清空（`write_text` 就是这样） | 从头开始写 | 新建 |
+| `"a"` | 不清空 | 接在原有内容的末尾 | 新建 |
+
+- 两种模式都**不会**自动创建目录，目录必须已经存在。
+- `with ... as f:`：缩进的代码块结束时自动关闭文件。文件关闭以后，写进去的内容才一定已经保存到文件里。
+- `f.write(字符串)` **不会**自动加换行，需要自己在末尾加 `"\n"`。
+- `encoding="utf-8"`：不写的话，用的是系统的默认编码。明确写出来，在哪台机器上结果都一样。
+
+##### ② JSON Lines（`.jsonl`）
+
+JSON Lines 的规则只有一条：**每一行是一个完整的 JSON 值（通常是一个对象），行与行之间用换行分隔。** 整个文件不是一个合法的 JSON，但每一行单独拿出来都是。
+
+```text
+{"n": 1, "ok": true}
+{"n": 2, "ok": false}
+```
+
+写入：`json.dumps(dict)` 默认就输出成一行。**不要加 `indent`**，`indent` 会在里面插入换行，一条记录就变成了好几行。
+
+```python
+from pathlib import Path
+import json
+
+log = Path("demo_out") / "events.jsonl"
+for n in [1, 2]:
+    with open(log, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"n": n, "ok": n == 1}) + "\n")
+
+for line in log.read_text(encoding="utf-8").splitlines():   # splitlines: split the text into lines
+    row = json.loads(line)
+    print(type(row), row["n"])
+# <class 'dict'> 1
+# <class 'dict'> 2
+```
+
+数行数：`wc -l demo_out/events.jsonl` 输出 `2 demo_out/events.jsonl`。`wc -l` 数的是换行符的个数，所以每一行末尾都要有 `"\n"`。
+
+##### ③ Python 的 `None` 写进 JSON 是 `null`
+
+```python
+import json
+
+print(json.dumps({"sha256": None, "ok": True, "n": 3}))
+# {"sha256": null, "ok": true, "n": 3}
+```
+
+| Python | JSON |
+|---|---|
+| `None` | `null` |
+| `True` / `False` | `true` / `false` |
+| `dict` | 对象 `{...}` |
+| `list` | 数组 `[...]` |
+
+用 `json.loads` 读回来时，会反过来再变回 Python 的值。
+
+##### ④ ISO 格式的时间：`isoformat(timespec="seconds")`
+
+```python
+from datetime import datetime, timezone, timedelta
+
+MYT = timezone(timedelta(hours=8))
+t = datetime(2026, 10, 23, 21, 5, 0, 123456, tzinfo=MYT)
+print(t.isoformat())                      # 2026-10-23T21:05:00.123456+08:00
+print(t.isoformat(timespec="seconds"))    # 2026-10-23T21:05:00+08:00
+print(datetime(2026, 10, 23, 21, 5, 0).isoformat(timespec="seconds"))
+# 2026-10-23T21:05:00                     <- no tzinfo, so no "+08:00"
+```
+
+- `timespec="seconds"`：只保留到秒，去掉微秒。
+- 末尾的 `+08:00` 表示"比 UTC 早 8 小时"，只有带时区的时间才会有。
+
 ### 第 5 步：失败处理
 
 网络错误、HTTP 4xx/5xx、响应不是合法 JSON，这三种情况都不能让程序直接崩溃退出。要做到：在日志里写一行 `status="failed"`（`error` 字段写明异常类型和信息），打印一条失败信息，然后程序以**退出码 1** 结束。成功时退出码是 0。
