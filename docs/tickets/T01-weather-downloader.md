@@ -412,6 +412,119 @@ print(datetime(2026, 10, 23, 21, 5, 0).isoformat(timespec="seconds"))
 - **要查的**：`try` / `except`、`response.raise_for_status()`、`requests.RequestException`、`response.json()` 失败时抛出的是哪种异常、`sys.exit`
 - **思考题**：失败时为什么也要写日志？算"可用率"时会用到哪几行？
 
+#### 第 5 步的迷你文档
+
+建议拆成四小步（同一个接口一分钟最多跑一次，404 网址也算）：
+
+- **5a**：先**不改代码**，只把 URL 临时改成 `forecastXX`。运行之前，先写下你的预测：会打印什么？会不会生成新的 `.gz`？`manifest.json` 会不会变？日志里会多一行什么？退出码（`echo $?`）是多少？然后运行，逐项对照。
+- **5b**：改代码，让失败时：日志写一行 `status="failed"`、打印一条失败信息、以退出码 1 结束。
+- **5c**：用 404 网址再跑一次，检查：
+  - 日志最后一行：`status` 是 `failed`，`error` 里能看出 404，6 个字段都在；
+  - `echo $?` 打印 `1`；
+  - 没有生成新的 `.gz` 文件，`manifest.json` 的内容和运行之前一样。
+- **5d**：把 URL 改回正确的网址，再跑一次，`echo $?` 打印 `0`，日志是 `changed` 或 `unchanged`。
+
+如果 5a 的运行在 `practice/output/` 里留下了不该有的东西，可以删掉。那里只是练习输出。
+
+##### ① `try` / `except` / `else` / `finally` 的执行顺序
+
+```python
+def run(fail):
+    print("--- fail =", fail)
+    try:
+        print("try: start")
+        if fail:
+            raise ValueError("bad value")     # raise: throw an exception on purpose
+        print("try: end")
+    except ValueError as e:
+        print("except:", e)
+    else:
+        print("else")
+    finally:
+        print("finally")
+    print("after")
+
+run(False)
+run(True)
+```
+
+输出：
+
+```text
+--- fail = False          --- fail = True
+try: start                try: start
+try: end                  except: bad value
+else                      finally
+finally                   after
+after
+```
+
+| 块 | 什么时候执行 |
+|---|---|
+| `try` | 总是从这里开始；一旦某一行抛出异常，`try` 里剩下的行就**不再执行**，直接跳去找匹配的 `except` |
+| `except 某类异常 as e` | `try` 里抛出的异常属于这一类（或它的子类）时执行；`e` 就是那个异常对象 |
+| `else` | `try` 里**没有**抛出异常时执行 |
+| `finally` | 不管有没有异常，最后都会执行 |
+
+- 异常被某个 `except` 接住以后，程序会接着执行整个 `try` 结构**后面**的代码（上面的 `after`）。接住异常不等于程序停下来。
+- 如果抛出的异常没有任何一个 `except` 能接住，`finally` 执行完以后，程序就带着这个异常崩溃退出。
+
+##### ② `requests` 的异常：一个父类管住全部
+
+`requests` 里所有的异常都是 `requests.RequestException` 的子类，所以 `except requests.RequestException` 能接住下面这些（在项目的 `.venv` 里验证过，requests 2.34）：
+
+| 异常 | 什么时候出现 |
+|---|---|
+| `requests.ConnectionError` | 连不上服务器（没网、域名错误） |
+| `requests.Timeout` | 超过 `timeout` 秒服务器都没有回应 |
+| `requests.HTTPError` | `response.raise_for_status()` 遇到 4xx/5xx |
+| `requests.exceptions.JSONDecodeError` | `response.json()` 发现内容不是合法的 JSON（它同时也是 `ValueError` 的子类） |
+
+不联网也能看到 `HTTPError` 长什么样：自己造一个状态码是 404 的响应对象。
+
+```python
+import requests
+
+r = requests.Response()          # an empty response built by hand, no network
+r.status_code = 404
+r.reason = "Not Found"
+r.url = "https://example.com/missing"
+try:
+    r.raise_for_status()
+except requests.RequestException as e:
+    print(f"{type(e).__name__}: {e}")
+# HTTPError: 404 Client Error: Not Found for url: https://example.com/missing
+```
+
+- `type(e).__name__`：异常的类名，比如 `HTTPError`。
+- `str(e)`（或者在 f-string 里直接写 `{e}`）：异常的信息。
+- 两个拼在一起，就是 ticket 要求的"异常类型和信息"。
+
+##### ③ 退出码：`sys.exit` 和 `echo $?`
+
+程序结束时会给操作系统留一个整数，叫**退出码**：`0` 表示成功，非 `0` 表示失败。VM 上的定时任务（systemd）、以后的 Airflow，都是看这个数字来判断一次运行成功还是失败的，它们不会去读你打印的文字。
+
+```python
+# exit_demo.py
+import sys
+
+print("about to exit")
+sys.exit(1)
+print("never printed")
+```
+
+```bash
+python exit_demo.py
+echo $?        # 1
+python -c "print('ok')"
+echo $?        # 0   <- a script that ends normally exits with 0
+```
+
+- `echo $?` 打印的是**上一条命令**的退出码，所以要紧接着运行，中间不要插别的命令。
+- 程序正常跑到最后，退出码自动是 `0`，不需要写 `sys.exit(0)`。
+- 程序因为没接住的异常崩溃时，退出码也是 `1`。但那样日志里不会有 `failed` 这一行，所以第 5 步要自己接住异常、写完日志，再主动退出。
+- `sys.exit` 的原理是抛出一个叫 `SystemExit` 的特殊异常，所以外面的 `finally` 仍然会执行；`except requests.RequestException` 不会接住它。
+
 ### 第 6 步：两个接口 + 命令行参数
 
 - 默认依次抓 `weather_forecast` 和 `weather_warning`，两次请求之间 `sleep` 20 秒。
