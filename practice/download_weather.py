@@ -14,6 +14,7 @@ from pathlib import Path
 import gzip
 import json
 import hashlib
+import sys
 
 # Malaysia time (UTC+8). Set explicitly because the collector VM's clock runs in UTC.
 MYT = timezone(timedelta(hours=8))
@@ -46,11 +47,12 @@ def fetch(url:str, MYT:timezone):
         records = response.json()       # parse once; also checks that the body is valid JSON
                                         # a list of records, one per location per date
         log_data["records"] = len(records)
-        log_data["error"] = None
 
     except requests.RequestException as e:
-        log_data["error"] = str(e)
-        log_data["sha256"] = None
+        error_msg = f"{type(e).__name__}: {e}"
+        print(f"FAILED:\n{error_msg}")
+        log_data["error"] = error_msg
+        log_data["status"] = "failed"
     finally:
         # Fetch time: taken once the request has finished. finally runs after try whether it
         # succeeded or failed, so the time exists on both paths and is set in one place only.
@@ -98,7 +100,6 @@ def save_if_changed(response, OUT_DIR, content_hash, manifest_path, fetched_at, 
         print("unchanged")
         log_data["status"] = "unchanged"
         log_data["sha256"] = content_hash
-        log_data["file"] = None
 
     else:
         # Folder named "date=<value>" (Hive-style partitioning): Spark turns it into a "date"
@@ -173,14 +174,20 @@ def main():
 
     # One run: fetch -> hash -> save if changed -> log
     response, records, log_data, fetched_at = fetch(url, MYT)
-
+    
+    if log_data["status"] == "failed":
+        append_jsonl(log_data, log_path)
+        return 1
+    
     content_hash = compute_content_hash(records)
 
     log_data = save_if_changed(response, OUT_DIR, content_hash, manifest_path, fetched_at, log_data)
 
     append_jsonl(log_data, log_path)
+    
+    return 0
 
 
 # Run main() only when this file is run directly (python practice/download_weather.py).
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
