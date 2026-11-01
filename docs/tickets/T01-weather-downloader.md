@@ -540,6 +540,115 @@ echo $?        # 0   <- a script that ends normally exits with 0
 - **文档**：<https://docs.python.org/3/howto/argparse.html>
 - **思考题**：为什么把"抓一个接口"写成一个函数，而不是复制粘贴两份代码？
 
+#### 第 6 步的迷你文档
+
+两个接口的网址：
+
+| name | URL |
+|---|---|
+| `weather_forecast` | `https://api.data.gov.my/weather/forecast/` |
+| `weather_warning` | `https://api.data.gov.my/weather/warning/` |
+
+输出目录用 name 命名：`practice/output/weather_forecast/`（已经有了）和 `practice/output/weather_warning/`（新的）。
+
+建议拆成四小步。现在一次完整的运行会请求两个接口，所以两次运行之间仍然至少隔一分钟：
+
+- **6a**：把"处理一个接口"的全部步骤（抓取、哈希、比较并保存、写日志）变成一个函数，接口的 name 和 URL 作为参数传进去，返回这个接口的退出码（0 或 1）。先只用 `weather_forecast` 调用它，确认结果和第 5 步一样：输出仍然写进原来的目录，原来的 manifest 和日志继续有效。
+- **6b**：用一个 dict 存 name → URL，循环处理两个接口，两次请求之间 `sleep` 20 秒。检查 `weather_warning/` 目录下有没有它自己的 `.gz`、manifest 和日志。
+- **6c**：加 `--only`。分别试 `--help`、`--only weather_warning`、`--only abc`。
+- **6d**：把 warning 的网址临时改成会返回 404 的网址，不带参数运行：forecast 应该照常处理，warning 记一行 `failed`，`echo $?` 打印 `1`。测完改回来。
+
+##### ① 用 dict 存 name → URL，再循环
+
+```python
+FEEDS = {
+    "kl": "https://example.com/kl",
+    "feeder": "https://example.com/feeder",
+}
+
+print(list(FEEDS))         # ['kl', 'feeder']   <- the keys, in the order they were written
+print(FEEDS["kl"])         # https://example.com/kl
+for name, url in FEEDS.items():
+    print(name, url)
+# kl https://example.com/kl
+# feeder https://example.com/feeder
+```
+
+- `.items()` 每次给出一对 `(key, value)`，`for name, url in ...` 把这一对拆成两个变量。
+- dict 会记住 key 写进去的顺序，所以循环的顺序就是你写的顺序。
+
+##### ② 只在两次请求之间等待：`time.sleep` 和 `enumerate`
+
+```python
+import time
+
+for i, (name, url) in enumerate(FEEDS.items()):
+    if i > 0:              # not before the first one
+        time.sleep(2)      # pause the program for 2 seconds
+    print(i, name, time.strftime("%H:%M:%S"))
+# 0 kl 04:22:53
+# 1 feeder 04:22:55        <- 2 seconds later
+```
+
+- `time.sleep(秒数)`：让程序停在这一行，等够了再继续往下执行。
+- `enumerate(...)`：在每个元素前面加一个从 0 开始的序号。`(name, url)` 外面的括号不能省略，因为 `enumerate` 给出的是 `(序号, (key, value))`。
+- 用 `if i > 0` 判断，第一个之前不等，最后一个之后也不会多等。
+
+##### ③ 命令行参数：`argparse`
+
+```python
+# feeds_demo.py
+import argparse
+
+FEEDS = {"kl": "https://example.com/kl", "feeder": "https://example.com/feeder"}
+
+parser = argparse.ArgumentParser(description="Print the URL of one or all feeds.")
+parser.add_argument(
+    "--only",
+    choices=list(FEEDS),          # ["kl", "feeder"]; any other value is an error
+    help="process only this feed (default: all feeds)",
+)
+args = parser.parse_args()        # reads what was typed after the script name
+print("args.only =", repr(args.only))
+```
+
+| 命令 | 输出 | 退出码 |
+|---|---|---|
+| `python feeds_demo.py` | `args.only = None` | 0 |
+| `python feeds_demo.py --only kl` | `args.only = 'kl'` | 0 |
+| `python feeds_demo.py --help` | 见下面 | 0 |
+| `python feeds_demo.py --only abc` | 见下面 | **2** |
+
+```text
+$ python feeds_demo.py --help
+usage: feeds_demo.py [-h] [--only {kl,feeder}]
+
+Print the URL of one or all feeds.
+
+options:
+  -h, --help          show this help message and exit
+  --only {kl,feeder}  process only this feed (default: all feeds)
+
+$ python feeds_demo.py --only abc
+usage: feeds_demo.py [-h] [--only {kl,feeder}]
+feeds_demo.py: error: argument --only: invalid choice: 'abc' (choose from 'kl', 'feeder')
+```
+
+- 以 `--` 开头的参数是**可选的**：没写时，它的值是 `None`。
+- 参数名 `--only` 变成 `args.only`。如果名字里有 `-`，比如 `--out-dir`，会变成 `args.out_dir`。
+- `choices`：值不在列表里时，argparse 自己打印错误并退出（退出码 2），你的代码不会继续执行。
+- `help`：`--help` 时显示的说明文字。`-h` / `--help` 是 argparse 自动加上的。
+
+##### ④ 多个结果里"只要有一个失败"：`any`
+
+```python
+codes = [0, 1, 0]                          # exit codes of three runs
+print(any(code != 0 for code in codes))    # True   <- at least one is not 0
+print(any(code != 0 for code in [0, 0]))   # False
+```
+
+`any(...)`：只要里面有一个是 `True`，结果就是 `True`。括号里的 `code != 0 for code in codes` 会对 `codes` 里的每一个值算一次 `code != 0`。
+
 ### 第 7 步：两个工业级细节
 
 1. **原子写入**：先写到 `xxx.json.gz.tmp`，写完再改名成 `xxx.json.gz`。查 `Path.replace`。
