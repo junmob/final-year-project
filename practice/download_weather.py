@@ -6,6 +6,7 @@
 #   practice/output/weather_forecast/date=<YYYY-MM-DD>/fetched_at=<HHMMSS>.json.gz
 #   practice/output/weather_forecast/manifest.json
 #   practice/output/weather_forecast/fetch_log.jsonl
+# Exit code: 0 if the fetch succeeded (changed or unchanged), 1 if it failed.
 # Usage: python practice/download_weather.py
 
 import requests
@@ -48,6 +49,11 @@ def fetch(url:str, MYT:timezone):
                                         # a list of records, one per location per date
         log_data["records"] = len(records)
 
+    # Only requests' own exceptions are caught. RequestException is the parent of all of them:
+    # ConnectionError, Timeout, HTTPError (from raise_for_status) and JSONDecodeError (from
+    # .json(), e.g. an HTML page sent with status 200). Anything else is a bug in this script and
+    # should crash with a traceback, not be logged as if the server had failed.
+    # The error keeps the exception type ("HTTPError: 404 ...") so failures can be grouped by cause.
     except requests.RequestException as e:
         error_msg = f"{type(e).__name__}: {e}"
         print(f"FAILED:\n{error_msg}")
@@ -174,20 +180,30 @@ def main():
 
     # One run: fetch -> hash -> save if changed -> log
     response, records, log_data, fetched_at = fetch(url, MYT)
-    
+
+    # A failed fetch must stop here, before hashing. records is None, so the hash would be the
+    # hash of "null": the first failure would save the error page (an HTML 404 page) as a
+    # forecast and point the manifest at it, and every later failure would match that hash and be
+    # logged as "unchanged", so an outage would look like a forecast that simply did not change.
+    # The failed line is still logged: without it "no new file" cannot be told apart from
+    # "unchanged", and availability (successful runs / all runs) would always look like 100%.
     if log_data["status"] == "failed":
         append_jsonl(log_data, log_path)
         return 1
-    
+
     content_hash = compute_content_hash(records)
 
     log_data = save_if_changed(response, OUT_DIR, content_hash, manifest_path, fetched_at, log_data)
 
     append_jsonl(log_data, log_path)
-    
+
     return 0
 
 
 # Run main() only when this file is run directly (python practice/download_weather.py).
+# main() returns 0 (success: changed or unchanged) or 1 (the fetch failed); sys.exit() hands that
+# number to the operating system as the exit code. A plain main() call would drop it and always
+# exit with 0. The VM's systemd timer (and Airflow later) reads the exit code, not the printed text,
+# to decide whether a run failed.
 if __name__ == "__main__":
     sys.exit(main())
