@@ -16,12 +16,18 @@ import gzip
 import json
 import hashlib
 import sys
+import time
+import argparse
+
+ENDPOINTS = {
+    "weather_forecast": "https://api.data.gov.my/weather/forecast/",
+    "weather_warning": "https://api.data.gov.my/weather/warning/"
+}
+
+OUT_DIR = Path(__file__).resolve().parent / "output"
 
 # Malaysia time (UTC+8). Set explicitly because the collector VM's clock runs in UTC.
 MYT = timezone(timedelta(hours=8))
-
-OUT_DIR = Path(__file__).resolve().parent / "output" / "weather_forecast"
-
 
 # Fetch the forecast once.
 # Returns the response, the parsed records, the log line started for this run, and the fetch time.
@@ -89,7 +95,7 @@ def compute_content_hash (records):
 
 # Save the raw response and update the manifest, but only if the content has changed since the
 # last saved copy. Fills in status, sha256 and file in the log line.
-def save_if_changed(response, OUT_DIR, content_hash, manifest_path, fetched_at, log_data):
+def save_if_changed(response, out_dir, content_hash, manifest_path, fetched_at, log_data):
     # The manifest remembers only the last saved copy: {"sha256": ..., "file": ...}.
     # Comparing with the last copy (not with every older one) keeps the archive a time series of
     # versions: if the forecast goes A -> B -> A, the second A is saved, because at that moment the
@@ -117,9 +123,9 @@ def save_if_changed(response, OUT_DIR, content_hash, manifest_path, fetched_at, 
         # inside. gzip-aware tools strip only the last one (gunzip gives "....json", Spark and
         # pandas pick the codec from ".gz" and still see JSON), so nobody has to open the file to
         # know what it holds.
-        out_dir = OUT_DIR / f"date={fetched_at:%Y-%m-%d}"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        gz_path = out_dir / f"fetched_at={fetched_at:%H%M%S}.json.gz"
+        partition_dir = out_dir / f"date={fetched_at:%Y-%m-%d}"
+        partition_dir.mkdir(parents=True, exist_ok=True)
+        gz_path = partition_dir / f"fetched_at={fetched_at:%H%M%S}.json.gz"
 
         # Save the raw response as gzip
         # - Raw, not parsed: Bronze keeps exactly what the server sent, so it can be parsed again if
@@ -142,7 +148,7 @@ def save_if_changed(response, OUT_DIR, content_hash, manifest_path, fetched_at, 
         # be saved.
         # The path is stored relative to weather_forecast/ (no home directory in it), so the
         # manifest stays valid when the output folder lives somewhere else, e.g. on the VM.
-        gz_relative_path = gz_path.relative_to(OUT_DIR)
+        gz_relative_path = gz_path.relative_to(out_dir)
 
         new_manifest = {
             "sha256": content_hash,
@@ -166,17 +172,15 @@ def save_if_changed(response, OUT_DIR, content_hash, manifest_path, fetched_at, 
 # A JSON array would have to be read, extended and rewritten in full on every run, and a crash
 # during that rewrite could leave the whole file unreadable. Here a crash can damage at most the
 # last line, and every other line still parses on its own.
-def append_jsonl(log_data:dict, log_path:Path):
+def append_log(log_data:dict, log_path:Path):
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_data) + "\n")    # no indent: one record must stay on one line
 
-
-def main():
-    # Settings and paths
-    url = 'https://api.data.gov.my/weather/forecast/'
-
-    manifest_path = OUT_DIR / "manifest.json"
-    log_path = OUT_DIR / "fetch_log.jsonl"
+def ingest_endpoint(name:str, url:str):
+    out_dir = OUT_DIR / name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = out_dir / "manifest.json"
+    log_path = out_dir / "fetch_log.jsonl"
 
     # One run: fetch -> hash -> save if changed -> log
     response, records, log_data, fetched_at = fetch(url, MYT)
@@ -188,16 +192,39 @@ def main():
     # The failed line is still logged: without it "no new file" cannot be told apart from
     # "unchanged", and availability (successful runs / all runs) would always look like 100%.
     if log_data["status"] == "failed":
-        append_jsonl(log_data, log_path)
+        append_log(log_data, log_path)
         return 1
 
     content_hash = compute_content_hash(records)
 
-    log_data = save_if_changed(response, OUT_DIR, content_hash, manifest_path, fetched_at, log_data)
+    log_data = save_if_changed(response, out_dir, content_hash, manifest_path, fetched_at, log_data)
 
-    append_jsonl(log_data, log_path)
+    append_log(log_data, log_path)
 
     return 0
+ 
+
+def main():
+    parser = argparse.ArgumentParser(description="Ingest weather feeds into the Bronze layer.")
+    parser.add_argument(
+        "--only",
+        choices=list(ENDPOINTS),
+        help="process only this feed (default: all feeds)"
+    )
+    args = parser.parse_args()
+
+    if args.only:
+        selected = {args.only: ENDPOINTS[args.only]}
+    else:
+        selected = ENDPOINTS
+
+    exit_codes = []
+    for i, (name, url) in enumerate(selected.items()):
+        if i > 0:
+            time.sleep(20)
+        exit_codes.append(ingest_endpoint(name, url))
+    
+    return 1 if any(exit_codes) else 0
 
 
 # Run main() only when this file is run directly (python practice/download_weather.py).
