@@ -1,13 +1,16 @@
 # download_weather.py (practice version of ingestion/download_weather.py, ticket T01)
-# Purpose: fetch the MET Malaysia 7-day weather forecast and archive the raw response as gzip.
-#   A new file is saved only when the content differs from the last saved copy; the hash and
-#   path of that copy are kept in manifest.json. Every run appends one line to fetch_log.jsonl.
-# Output (Malaysia time):
-#   practice/output/weather_forecast/date=<YYYY-MM-DD>/fetched_at=<HHMMSS>.json.gz
-#   practice/output/weather_forecast/manifest.json
-#   practice/output/weather_forecast/fetch_log.jsonl
-# Exit code: 0 if the fetch succeeded (changed or unchanged), 1 if it failed.
-# Usage: python practice/download_weather.py
+# Purpose: fetch the MET Malaysia weather endpoints (7-day forecast and warnings) and archive each
+#   raw response as gzip. A new file is saved only when the content differs from the last saved
+#   copy; the hash and path of that copy are kept in manifest.json. Every endpoint fetched appends
+#   one line to its own fetch_log.jsonl.
+# Output (Malaysia time), one folder per endpoint (<name> = weather_forecast or weather_warning):
+#   practice/output/<name>/date=<YYYY-MM-DD>/fetched_at=<HHMMSS>.json.gz
+#   practice/output/<name>/manifest.json
+#   practice/output/<name>/fetch_log.jsonl
+# Exit code: 0 if every selected endpoint succeeded (changed or unchanged), 1 if any failed.
+# Usage:
+#   python practice/download_weather.py                          # both endpoints, 20 s apart
+#   python practice/download_weather.py --only weather_warning   # one endpoint only
 
 import requests
 from datetime import datetime, timezone, timedelta
@@ -19,17 +22,20 @@ import sys
 import time
 import argparse
 
+# name -> URL. The name is also the endpoint's output folder and a valid value for --only.
+# Adding an endpoint with the same steps (fetch JSON, hash, save if changed, log) is one more line.
 ENDPOINTS = {
     "weather_forecast": "https://api.data.gov.my/weather/forecast/",
     "weather_warning": "https://api.data.gov.my/weather/warning/"
 }
 
+# Each endpoint writes under OUT_DIR / <name>, with its own files, manifest and log.
 OUT_DIR = Path(__file__).resolve().parent / "output"
 
 # Malaysia time (UTC+8). Set explicitly because the collector VM's clock runs in UTC.
 MYT = timezone(timedelta(hours=8))
 
-# Fetch the forecast once.
+# Fetch one endpoint once.
 # Returns the response, the parsed records, the log line started for this run, and the fetch time.
 def fetch(url:str, MYT:timezone):
     response = None
@@ -146,8 +152,10 @@ def save_if_changed(response, out_dir, content_hash, manifest_path, fetched_at, 
         # between the two steps would leave a manifest that points at a file that does not exist;
         # the next run would find the same hash and print "unchanged", so that version would never
         # be saved.
-        # The path is stored relative to weather_forecast/ (no home directory in it), so the
-        # manifest stays valid when the output folder lives somewhere else, e.g. on the VM.
+        # The path is stored relative to the endpoint's own folder (out_dir), with no home
+        # directory and no endpoint name in it, so out_dir / file always finds the file, also when
+        # the output folder lives somewhere else, e.g. on the VM. It must be out_dir, not the
+        # global OUT_DIR: that one is the parent of all endpoints and would add "<name>/" in front.
         gz_relative_path = gz_path.relative_to(out_dir)
 
         new_manifest = {
@@ -176,13 +184,21 @@ def append_log(log_data:dict, log_path:Path):
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_data) + "\n")    # no indent: one record must stay on one line
 
+
+# All the steps for one endpoint: fetch -> hash -> save if changed -> log. Returns its exit code
+# (0 = changed or unchanged, 1 = failed).
+# Every endpoint goes through the same steps and only the name and URL differ, so the steps live
+# in one function instead of one copy per endpoint. With copies, a later fix (e.g. step 7's atomic
+# write) would have to be made in every copy, and a copy that is missed still runs without any
+# error, just with the old behaviour.
 def ingest_endpoint(name:str, url:str):
     out_dir = OUT_DIR / name
+    # Created here, not only when a file is saved: a failed first fetch still needs the folder
+    # for its log line.
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = out_dir / "manifest.json"
     log_path = out_dir / "fetch_log.jsonl"
 
-    # One run: fetch -> hash -> save if changed -> log
     response, records, log_data, fetched_at = fetch(url, MYT)
 
     # A failed fetch must stop here, before hashing. records is None, so the hash would be the
@@ -202,9 +218,13 @@ def ingest_endpoint(name:str, url:str):
     append_log(log_data, log_path)
 
     return 0
- 
+
 
 def main():
+    # --only exists because the VM runs the endpoints on separate timers: the forecast every 3 h
+    # and the warnings every hour, each calling this script with --only <name>. Without it, the
+    # hourly warning run would also fetch the forecast every hour.
+    # choices: argparse itself rejects any other name (error message, exit code 2).
     parser = argparse.ArgumentParser(description="Ingest weather feeds into the Bronze layer.")
     parser.add_argument(
         "--only",
@@ -218,17 +238,23 @@ def main():
     else:
         selected = ENDPOINTS
 
+    # Both endpoints share the Weather API limit of 4 requests per minute. The limit is a ceiling,
+    # not a target: one request per endpoint per run is all that is needed. 20 s between requests
+    # means at most 3 a minute, which leaves room for timing jitter and for other runs (e.g. the
+    # VM's timers) using the same limit; 15 s would sit exactly on the limit.
+    # The sleep is only between requests (i > 0): none before the first or after the last.
+    # A failed endpoint does not stop the loop: the other endpoint is still fetched and logged.
     exit_codes = []
     for i, (name, url) in enumerate(selected.items()):
         if i > 0:
             time.sleep(20)
         exit_codes.append(ingest_endpoint(name, url))
-    
-    return 1 if any(exit_codes) else 0
+
+    return 1 if any(exit_codes) else 0     # 1 if at least one endpoint returned 1
 
 
 # Run main() only when this file is run directly (python practice/download_weather.py).
-# main() returns 0 (success: changed or unchanged) or 1 (the fetch failed); sys.exit() hands that
+# main() returns 0 (every endpoint succeeded) or 1 (at least one failed); sys.exit() hands that
 # number to the operating system as the exit code. A plain main() call would drop it and always
 # exit with 0. The VM's systemd timer (and Airflow later) reads the exit code, not the printed text,
 # to decide whether a run failed.
