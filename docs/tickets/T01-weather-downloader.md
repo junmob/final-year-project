@@ -656,6 +656,70 @@ print(any(code != 0 for code in [0, 0]))   # False
 2. **gzip 的 `mtime=0`**：查 `gzip.compress` 的 `mtime` 参数。
    - 思考题：同样的内容压缩两次，得到的字节为什么可能不一样？为什么"相同输入得到相同字节"对数据管道很重要？
 
+#### 第 7 步的迷你文档
+
+建议拆成两小步，各自验收：
+
+- **7a（原子写入）**：改成先写 `.tmp` 再改名。跑一次（内容要变才会存文件，可以先删掉 manifest），检查：文件夹里只有 `.json.gz`，没有留下 `.tmp`；`zcat` 能正常解开。
+- **7b（`mtime=0`）**：加上 `mtime=0`。用 `--only weather_forecast`，**每次运行前都删掉 manifest**，隔一分钟以上跑两次，这样会存下两个文件。如果两次的内容相同（日志里两次的 `sha256` 一样），用 `sha256sum` 比较这两个 `.gz` 文件，结果应该一样。没有 `mtime=0` 时，这两个结果会不一样。
+
+##### ① 先写临时文件，再改名：`Path.replace`
+
+```python
+from pathlib import Path
+
+target = Path("demo_out") / "x.json.gz"
+target.parent.mkdir(parents=True, exist_ok=True)
+
+tmp = target.with_name(target.name + ".tmp")     # x.json.gz.tmp, in the same folder
+tmp.write_bytes(b"...")                          # 1. write everything to the temporary name
+print(sorted(p.name for p in target.parent.iterdir()))   # ['x.json.gz.tmp']
+tmp.replace(target)                              # 2. rename it to the real name
+print(sorted(p.name for p in target.parent.iterdir()))   # ['x.json.gz']
+```
+
+- `a.replace(b)`：把文件 `a` 改名为 `b`。如果 `b` 已经存在，就直接替换掉它。
+- 在 Linux 上，**同一个文件系统里的改名是原子的**："原子"的意思是这个操作要么完全发生，要么完全没发生，别的程序不可能看到"改了一半"的状态。所以 `.tmp` 一定要和目标文件放在**同一个文件夹**里。
+- `write_bytes` 不是原子的：数据是一块一块写进硬盘的，写一个文件需要一段时间。
+- 不要用 `with_suffix(".tmp")`，它会**替换**最后一个扩展名，得到的是 `x.json.tmp`，而不是 `x.json.gz.tmp`：
+
+```python
+print(target.with_suffix(".tmp").name)            # x.json.tmp
+print(target.with_name(target.name + ".tmp").name)   # x.json.gz.tmp
+```
+
+##### ② gzip 的头部和 `mtime` 参数
+
+gzip 文件的开头有 10 个字节的"头部"，其中第 5 到第 8 个字节记录一个时间戳（`mtime`）。`gzip.compress` 的 `mtime` 参数决定这里写什么：
+
+- 不传（默认）：写入**压缩那一刻的当前时间**。
+- `mtime=0`：写入 0。
+
+```python
+import gzip
+import time
+
+data = b'{"a": 1}'
+a = gzip.compress(data)
+time.sleep(1.1)
+b = gzip.compress(data)
+print(a == b)                    # False
+print(a[:8].hex(" "))            # 1f 8b 08 00 78 15 e9 6a
+print(b[:8].hex(" "))            # 1f 8b 08 00 79 15 e9 6a   <- bytes 5-8 differ
+
+c = gzip.compress(data, mtime=0)
+time.sleep(1.1)
+d = gzip.compress(data, mtime=0)
+print(c == d)                    # True
+print(c[:8].hex(" "))            # 1f 8b 08 00 00 00 00 00
+
+print(gzip.decompress(a) == gzip.decompress(c))   # True   <- the content inside is the same
+```
+
+- `.hex(" ")`：把字节显示成十六进制，用空格隔开，方便看清每一个字节。
+- 你运行时，前两行的时间戳字节会和上面不一样，因为那是你运行的时刻。
+- `sha256sum 文件名`：在终端里算一个文件的 SHA-256，比较的是文件的**全部字节**，包括 gzip 头部。
+
 ### 完成后
 
 1. 自查：所有全局约束都满足；7 个思考题都能用自己的话回答（写在 commit message 里，或者直接告诉我都可以）。
