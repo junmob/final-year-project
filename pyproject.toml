@@ -1,0 +1,15 @@
+# Tool settings for this repository (pytest and ruff).
+# The repository is a set of scripts, not an installable package, so there is no [project] section.
+
+[tool.pytest.ini_options]
+# Running "pytest" with no arguments collects tests from tests/ only.
+testpaths = ["tests"]
+# Put ingestion/ on the import path, so a test can write "import collect_gtfs_rt". The collectors
+# are plain scripts in a folder, not a package, so they cannot be imported by path otherwise.
+pythonpath = ["ingestion"]
+
+[tool.ruff]
+# Same width as the comments in ingestion/ already use.
+line-length = 100
+# The Python version the code must run on (local .venv, the VM and GitHub Actions use 3.12).
+target-version = "py312"

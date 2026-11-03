@@ -18,4 +18,6 @@ venv/
 *.pem
 *.key
 *:Zone.Identifier
+# output of the T01 practice script (the script itself lives only on the t01-weather-downloader branch)
+practice/output/
 .claude/settings.local.json

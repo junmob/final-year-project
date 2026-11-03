@@ -1,0 +1,6 @@
+# Development tools (tests and lint), on top of the collectors' runtime dependencies.
+# Install into the project .venv: pip install -r requirements-dev.txt
+# The tools are pinned to exact versions so that a local run and CI give the same results.
+-r ingestion/requirements.txt
+pytest==9.2.0
+ruff==0.17.3
