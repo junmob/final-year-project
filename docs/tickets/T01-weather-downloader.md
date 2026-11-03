@@ -303,6 +303,106 @@ print(full.relative_to(base))          # date=2026-10-24/fetched_at=101500.json.
 - **文档**：<https://jsonlines.org/>
 - **思考题**：为什么用 jsonl（一行一个 JSON），而不是把所有记录放进一个大的 JSON 数组？
 
+#### 第 4 步的迷你文档
+
+建议拆成四小步，每做完一小步就运行一次（同一个接口一分钟最多跑一次）：
+
+- **4a**：先不写文件。把这次运行的 6 个字段放进一个 dict，用 `print(json.dumps(...))` 打印出来，检查字段名和值对不对。
+- **4b**：把这一行追加写进 `fetch_log.jsonl`，用 `cat` 查看。
+- **4c**：删掉 `fetch_log.jsonl`，从头再跑 3 次，用 `wc -l` 数行数。
+- **4d**：逐行用 `json.loads` 解析一遍（见 ②），确认每一行都能解析。
+
+这一步运行时只会出现 `changed` 和 `unchanged`。`failed` 要等第 5 步加上失败处理以后才会出现：现在请求一失败，程序就直接崩溃退出了，走不到写日志的那一行。
+
+##### ① 追加写入：`open(path, "a")` 和 `with`
+
+```python
+from pathlib import Path
+
+p = Path("demo_out") / "notes.txt"
+p.parent.mkdir(parents=True, exist_ok=True)
+with open(p, "a", encoding="utf-8") as f:
+    f.write("first\n")
+with open(p, "a", encoding="utf-8") as f:
+    f.write("second\n")
+print(p.read_text(encoding="utf-8"))
+# first
+# second
+```
+
+| 模式 | 打开时 | 写在哪里 | 文件不存在时 |
+|---|---|---|---|
+| `"w"` | 先清空（`write_text` 就是这样） | 从头开始写 | 新建 |
+| `"a"` | 不清空 | 接在原有内容的末尾 | 新建 |
+
+- 两种模式都**不会**自动创建目录，目录必须已经存在。
+- `with ... as f:`：缩进的代码块结束时自动关闭文件。文件关闭以后，写进去的内容才一定已经保存到文件里。
+- `f.write(字符串)` **不会**自动加换行，需要自己在末尾加 `"\n"`。
+- `encoding="utf-8"`：不写的话，用的是系统的默认编码。明确写出来，在哪台机器上结果都一样。
+
+##### ② JSON Lines（`.jsonl`）
+
+JSON Lines 的规则只有一条：**每一行是一个完整的 JSON 值（通常是一个对象），行与行之间用换行分隔。** 整个文件不是一个合法的 JSON，但每一行单独拿出来都是。
+
+```text
+{"n": 1, "ok": true}
+{"n": 2, "ok": false}
+```
+
+写入：`json.dumps(dict)` 默认就输出成一行。**不要加 `indent`**，`indent` 会在里面插入换行，一条记录就变成了好几行。
+
+```python
+from pathlib import Path
+import json
+
+log = Path("demo_out") / "events.jsonl"
+for n in [1, 2]:
+    with open(log, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"n": n, "ok": n == 1}) + "\n")
+
+for line in log.read_text(encoding="utf-8").splitlines():   # splitlines: split the text into lines
+    row = json.loads(line)
+    print(type(row), row["n"])
+# <class 'dict'> 1
+# <class 'dict'> 2
+```
+
+数行数：`wc -l demo_out/events.jsonl` 输出 `2 demo_out/events.jsonl`。`wc -l` 数的是换行符的个数，所以每一行末尾都要有 `"\n"`。
+
+##### ③ Python 的 `None` 写进 JSON 是 `null`
+
+```python
+import json
+
+print(json.dumps({"sha256": None, "ok": True, "n": 3}))
+# {"sha256": null, "ok": true, "n": 3}
+```
+
+| Python | JSON |
+|---|---|
+| `None` | `null` |
+| `True` / `False` | `true` / `false` |
+| `dict` | 对象 `{...}` |
+| `list` | 数组 `[...]` |
+
+用 `json.loads` 读回来时，会反过来再变回 Python 的值。
+
+##### ④ ISO 格式的时间：`isoformat(timespec="seconds")`
+
+```python
+from datetime import datetime, timezone, timedelta
+
+MYT = timezone(timedelta(hours=8))
+t = datetime(2026, 10, 23, 21, 5, 0, 123456, tzinfo=MYT)
+print(t.isoformat())                      # 2026-10-23T21:05:00.123456+08:00
+print(t.isoformat(timespec="seconds"))    # 2026-10-23T21:05:00+08:00
+print(datetime(2026, 10, 23, 21, 5, 0).isoformat(timespec="seconds"))
+# 2026-10-23T21:05:00                     <- no tzinfo, so no "+08:00"
+```
+
+- `timespec="seconds"`：只保留到秒，去掉微秒。
+- 末尾的 `+08:00` 表示"比 UTC 早 8 小时"，只有带时区的时间才会有。
+
 ### 第 5 步：失败处理
 
 网络错误、HTTP 4xx/5xx、响应不是合法 JSON，这三种情况都不能让程序直接崩溃退出。要做到：在日志里写一行 `status="failed"`（`error` 字段写明异常类型和信息），打印一条失败信息，然后程序以**退出码 1** 结束。成功时退出码是 0。
@@ -311,6 +411,119 @@ print(full.relative_to(base))          # date=2026-10-24/fetched_at=101500.json.
 - **验收**：日志里有一行 failed，`error` 字段里能看出是 404；运行后执行 `echo $?`，打印 `1`。
 - **要查的**：`try` / `except`、`response.raise_for_status()`、`requests.RequestException`、`response.json()` 失败时抛出的是哪种异常、`sys.exit`
 - **思考题**：失败时为什么也要写日志？算"可用率"时会用到哪几行？
+
+#### 第 5 步的迷你文档
+
+建议拆成四小步（同一个接口一分钟最多跑一次，404 网址也算）：
+
+- **5a**：先**不改代码**，只把 URL 临时改成 `forecastXX`。运行之前，先写下你的预测：会打印什么？会不会生成新的 `.gz`？`manifest.json` 会不会变？日志里会多一行什么？退出码（`echo $?`）是多少？然后运行，逐项对照。
+- **5b**：改代码，让失败时：日志写一行 `status="failed"`、打印一条失败信息、以退出码 1 结束。
+- **5c**：用 404 网址再跑一次，检查：
+  - 日志最后一行：`status` 是 `failed`，`error` 里能看出 404，6 个字段都在；
+  - `echo $?` 打印 `1`；
+  - 没有生成新的 `.gz` 文件，`manifest.json` 的内容和运行之前一样。
+- **5d**：把 URL 改回正确的网址，再跑一次，`echo $?` 打印 `0`，日志是 `changed` 或 `unchanged`。
+
+如果 5a 的运行在 `practice/output/` 里留下了不该有的东西，可以删掉。那里只是练习输出。
+
+##### ① `try` / `except` / `else` / `finally` 的执行顺序
+
+```python
+def run(fail):
+    print("--- fail =", fail)
+    try:
+        print("try: start")
+        if fail:
+            raise ValueError("bad value")     # raise: throw an exception on purpose
+        print("try: end")
+    except ValueError as e:
+        print("except:", e)
+    else:
+        print("else")
+    finally:
+        print("finally")
+    print("after")
+
+run(False)
+run(True)
+```
+
+输出：
+
+```text
+--- fail = False          --- fail = True
+try: start                try: start
+try: end                  except: bad value
+else                      finally
+finally                   after
+after
+```
+
+| 块 | 什么时候执行 |
+|---|---|
+| `try` | 总是从这里开始；一旦某一行抛出异常，`try` 里剩下的行就**不再执行**，直接跳去找匹配的 `except` |
+| `except 某类异常 as e` | `try` 里抛出的异常属于这一类（或它的子类）时执行；`e` 就是那个异常对象 |
+| `else` | `try` 里**没有**抛出异常时执行 |
+| `finally` | 不管有没有异常，最后都会执行 |
+
+- 异常被某个 `except` 接住以后，程序会接着执行整个 `try` 结构**后面**的代码（上面的 `after`）。接住异常不等于程序停下来。
+- 如果抛出的异常没有任何一个 `except` 能接住，`finally` 执行完以后，程序就带着这个异常崩溃退出。
+
+##### ② `requests` 的异常：一个父类管住全部
+
+`requests` 里所有的异常都是 `requests.RequestException` 的子类，所以 `except requests.RequestException` 能接住下面这些（在项目的 `.venv` 里验证过，requests 2.34）：
+
+| 异常 | 什么时候出现 |
+|---|---|
+| `requests.ConnectionError` | 连不上服务器（没网、域名错误） |
+| `requests.Timeout` | 超过 `timeout` 秒服务器都没有回应 |
+| `requests.HTTPError` | `response.raise_for_status()` 遇到 4xx/5xx |
+| `requests.exceptions.JSONDecodeError` | `response.json()` 发现内容不是合法的 JSON（它同时也是 `ValueError` 的子类） |
+
+不联网也能看到 `HTTPError` 长什么样：自己造一个状态码是 404 的响应对象。
+
+```python
+import requests
+
+r = requests.Response()          # an empty response built by hand, no network
+r.status_code = 404
+r.reason = "Not Found"
+r.url = "https://example.com/missing"
+try:
+    r.raise_for_status()
+except requests.RequestException as e:
+    print(f"{type(e).__name__}: {e}")
+# HTTPError: 404 Client Error: Not Found for url: https://example.com/missing
+```
+
+- `type(e).__name__`：异常的类名，比如 `HTTPError`。
+- `str(e)`（或者在 f-string 里直接写 `{e}`）：异常的信息。
+- 两个拼在一起，就是 ticket 要求的"异常类型和信息"。
+
+##### ③ 退出码：`sys.exit` 和 `echo $?`
+
+程序结束时会给操作系统留一个整数，叫**退出码**：`0` 表示成功，非 `0` 表示失败。VM 上的定时任务（systemd）、以后的 Airflow，都是看这个数字来判断一次运行成功还是失败的，它们不会去读你打印的文字。
+
+```python
+# exit_demo.py
+import sys
+
+print("about to exit")
+sys.exit(1)
+print("never printed")
+```
+
+```bash
+python exit_demo.py
+echo $?        # 1
+python -c "print('ok')"
+echo $?        # 0   <- a script that ends normally exits with 0
+```
+
+- `echo $?` 打印的是**上一条命令**的退出码，所以要紧接着运行，中间不要插别的命令。
+- 程序正常跑到最后，退出码自动是 `0`，不需要写 `sys.exit(0)`。
+- 程序因为没接住的异常崩溃时，退出码也是 `1`。但那样日志里不会有 `failed` 这一行，所以第 5 步要自己接住异常、写完日志，再主动退出。
+- `sys.exit` 的原理是抛出一个叫 `SystemExit` 的特殊异常，所以外面的 `finally` 仍然会执行；`except requests.RequestException` 不会接住它。
 
 ### 第 6 步：两个接口 + 命令行参数
 
@@ -327,12 +540,185 @@ print(full.relative_to(base))          # date=2026-10-24/fetched_at=101500.json.
 - **文档**：<https://docs.python.org/3/howto/argparse.html>
 - **思考题**：为什么把"抓一个接口"写成一个函数，而不是复制粘贴两份代码？
 
+#### 第 6 步的迷你文档
+
+两个接口的网址：
+
+| name | URL |
+|---|---|
+| `weather_forecast` | `https://api.data.gov.my/weather/forecast/` |
+| `weather_warning` | `https://api.data.gov.my/weather/warning/` |
+
+输出目录用 name 命名：`practice/output/weather_forecast/`（已经有了）和 `practice/output/weather_warning/`（新的）。
+
+建议拆成四小步。现在一次完整的运行会请求两个接口，所以两次运行之间仍然至少隔一分钟：
+
+- **6a**：把"处理一个接口"的全部步骤（抓取、哈希、比较并保存、写日志）变成一个函数，接口的 name 和 URL 作为参数传进去，返回这个接口的退出码（0 或 1）。先只用 `weather_forecast` 调用它，确认结果和第 5 步一样：输出仍然写进原来的目录，原来的 manifest 和日志继续有效。
+- **6b**：用一个 dict 存 name → URL，循环处理两个接口，两次请求之间 `sleep` 20 秒。检查 `weather_warning/` 目录下有没有它自己的 `.gz`、manifest 和日志。
+- **6c**：加 `--only`。分别试 `--help`、`--only weather_warning`、`--only abc`。
+- **6d**：把 warning 的网址临时改成会返回 404 的网址，不带参数运行：forecast 应该照常处理，warning 记一行 `failed`，`echo $?` 打印 `1`。测完改回来。
+
+##### ① 用 dict 存 name → URL，再循环
+
+```python
+FEEDS = {
+    "kl": "https://example.com/kl",
+    "feeder": "https://example.com/feeder",
+}
+
+print(list(FEEDS))         # ['kl', 'feeder']   <- the keys, in the order they were written
+print(FEEDS["kl"])         # https://example.com/kl
+for name, url in FEEDS.items():
+    print(name, url)
+# kl https://example.com/kl
+# feeder https://example.com/feeder
+```
+
+- `.items()` 每次给出一对 `(key, value)`，`for name, url in ...` 把这一对拆成两个变量。
+- dict 会记住 key 写进去的顺序，所以循环的顺序就是你写的顺序。
+
+##### ② 只在两次请求之间等待：`time.sleep` 和 `enumerate`
+
+```python
+import time
+
+for i, (name, url) in enumerate(FEEDS.items()):
+    if i > 0:              # not before the first one
+        time.sleep(2)      # pause the program for 2 seconds
+    print(i, name, time.strftime("%H:%M:%S"))
+# 0 kl 04:22:53
+# 1 feeder 04:22:55        <- 2 seconds later
+```
+
+- `time.sleep(秒数)`：让程序停在这一行，等够了再继续往下执行。
+- `enumerate(...)`：在每个元素前面加一个从 0 开始的序号。`(name, url)` 外面的括号不能省略，因为 `enumerate` 给出的是 `(序号, (key, value))`。
+- 用 `if i > 0` 判断，第一个之前不等，最后一个之后也不会多等。
+
+##### ③ 命令行参数：`argparse`
+
+```python
+# feeds_demo.py
+import argparse
+
+FEEDS = {"kl": "https://example.com/kl", "feeder": "https://example.com/feeder"}
+
+parser = argparse.ArgumentParser(description="Print the URL of one or all feeds.")
+parser.add_argument(
+    "--only",
+    choices=list(FEEDS),          # ["kl", "feeder"]; any other value is an error
+    help="process only this feed (default: all feeds)",
+)
+args = parser.parse_args()        # reads what was typed after the script name
+print("args.only =", repr(args.only))
+```
+
+| 命令 | 输出 | 退出码 |
+|---|---|---|
+| `python feeds_demo.py` | `args.only = None` | 0 |
+| `python feeds_demo.py --only kl` | `args.only = 'kl'` | 0 |
+| `python feeds_demo.py --help` | 见下面 | 0 |
+| `python feeds_demo.py --only abc` | 见下面 | **2** |
+
+```text
+$ python feeds_demo.py --help
+usage: feeds_demo.py [-h] [--only {kl,feeder}]
+
+Print the URL of one or all feeds.
+
+options:
+  -h, --help          show this help message and exit
+  --only {kl,feeder}  process only this feed (default: all feeds)
+
+$ python feeds_demo.py --only abc
+usage: feeds_demo.py [-h] [--only {kl,feeder}]
+feeds_demo.py: error: argument --only: invalid choice: 'abc' (choose from 'kl', 'feeder')
+```
+
+- 以 `--` 开头的参数是**可选的**：没写时，它的值是 `None`。
+- 参数名 `--only` 变成 `args.only`。如果名字里有 `-`，比如 `--out-dir`，会变成 `args.out_dir`。
+- `choices`：值不在列表里时，argparse 自己打印错误并退出（退出码 2），你的代码不会继续执行。
+- `help`：`--help` 时显示的说明文字。`-h` / `--help` 是 argparse 自动加上的。
+
+##### ④ 多个结果里"只要有一个失败"：`any`
+
+```python
+codes = [0, 1, 0]                          # exit codes of three runs
+print(any(code != 0 for code in codes))    # True   <- at least one is not 0
+print(any(code != 0 for code in [0, 0]))   # False
+```
+
+`any(...)`：只要里面有一个是 `True`，结果就是 `True`。括号里的 `code != 0 for code in codes` 会对 `codes` 里的每一个值算一次 `code != 0`。
+
 ### 第 7 步：两个工业级细节
 
 1. **原子写入**：先写到 `xxx.json.gz.tmp`，写完再改名成 `xxx.json.gz`。查 `Path.replace`。
    - 思考题：如果写到一半断电，不这样做会留下什么？
 2. **gzip 的 `mtime=0`**：查 `gzip.compress` 的 `mtime` 参数。
    - 思考题：同样的内容压缩两次，得到的字节为什么可能不一样？为什么"相同输入得到相同字节"对数据管道很重要？
+
+#### 第 7 步的迷你文档
+
+建议拆成两小步，各自验收：
+
+- **7a（原子写入）**：改成先写 `.tmp` 再改名。跑一次（内容要变才会存文件，可以先删掉 manifest），检查：文件夹里只有 `.json.gz`，没有留下 `.tmp`；`zcat` 能正常解开。
+- **7b（`mtime=0`）**：加上 `mtime=0`。用 `--only weather_forecast`，**每次运行前都删掉 manifest**，隔一分钟以上跑两次，这样会存下两个文件。如果两次的内容相同（日志里两次的 `sha256` 一样），用 `sha256sum` 比较这两个 `.gz` 文件，结果应该一样。没有 `mtime=0` 时，这两个结果会不一样。
+
+##### ① 先写临时文件，再改名：`Path.replace`
+
+```python
+from pathlib import Path
+
+target = Path("demo_out") / "x.json.gz"
+target.parent.mkdir(parents=True, exist_ok=True)
+
+tmp = target.with_name(target.name + ".tmp")     # x.json.gz.tmp, in the same folder
+tmp.write_bytes(b"...")                          # 1. write everything to the temporary name
+print(sorted(p.name for p in target.parent.iterdir()))   # ['x.json.gz.tmp']
+tmp.replace(target)                              # 2. rename it to the real name
+print(sorted(p.name for p in target.parent.iterdir()))   # ['x.json.gz']
+```
+
+- `a.replace(b)`：把文件 `a` 改名为 `b`。如果 `b` 已经存在，就直接替换掉它。
+- 在 Linux 上，**同一个文件系统里的改名是原子的**："原子"的意思是这个操作要么完全发生，要么完全没发生，别的程序不可能看到"改了一半"的状态。所以 `.tmp` 一定要和目标文件放在**同一个文件夹**里。
+- `write_bytes` 不是原子的：数据是一块一块写进硬盘的，写一个文件需要一段时间。
+- 不要用 `with_suffix(".tmp")`，它会**替换**最后一个扩展名，得到的是 `x.json.tmp`，而不是 `x.json.gz.tmp`：
+
+```python
+print(target.with_suffix(".tmp").name)            # x.json.tmp
+print(target.with_name(target.name + ".tmp").name)   # x.json.gz.tmp
+```
+
+##### ② gzip 的头部和 `mtime` 参数
+
+gzip 文件的开头有 10 个字节的"头部"，其中第 5 到第 8 个字节记录一个时间戳（`mtime`）。`gzip.compress` 的 `mtime` 参数决定这里写什么：
+
+- 不传（默认）：写入**压缩那一刻的当前时间**。
+- `mtime=0`：写入 0。
+
+```python
+import gzip
+import time
+
+data = b'{"a": 1}'
+a = gzip.compress(data)
+time.sleep(1.1)
+b = gzip.compress(data)
+print(a == b)                    # False
+print(a[:8].hex(" "))            # 1f 8b 08 00 78 15 e9 6a
+print(b[:8].hex(" "))            # 1f 8b 08 00 79 15 e9 6a   <- bytes 5-8 differ
+
+c = gzip.compress(data, mtime=0)
+time.sleep(1.1)
+d = gzip.compress(data, mtime=0)
+print(c == d)                    # True
+print(c[:8].hex(" "))            # 1f 8b 08 00 00 00 00 00
+
+print(gzip.decompress(a) == gzip.decompress(c))   # True   <- the content inside is the same
+```
+
+- `.hex(" ")`：把字节显示成十六进制，用空格隔开，方便看清每一个字节。
+- 你运行时，前两行的时间戳字节会和上面不一样，因为那是你运行的时刻。
+- `sha256sum 文件名`：在终端里算一个文件的 SHA-256，比较的是文件的**全部字节**，包括 gzip 头部。
 
 ### 完成后
 
