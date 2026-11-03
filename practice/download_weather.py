@@ -133,6 +133,19 @@ def save_if_changed(response, out_dir, content_hash, manifest_path, fetched_at, 
         partition_dir.mkdir(parents=True, exist_ok=True)
         gz_path = partition_dir / f"fetched_at={fetched_at:%H%M%S}.json.gz"
 
+        # Atomic write: write everything to "<name>.tmp" first, then rename it to the real name.
+        # Writing straight to gz_path gives the file its real name as soon as writing starts. A
+        # crash halfway (power cut, VM restart, killed process) would leave a truncated .gz that
+        # looks like a normal file: gzip readers fail on it ("unexpected end of file"), and nothing
+        # ever repairs it, because the manifest was not updated and the next run saves a new file
+        # under a new name. With the .tmp step a half-written file keeps the ".tmp" ending, so
+        # anything that looks for "*.json.gz" never sees it.
+        # with_name(name + ".tmp") keeps the full target name in front ("....json.gz.tmp");
+        # with_suffix(".tmp") would replace ".gz" and give "....json.tmp".
+        # The .tmp file is in the same folder on purpose: a rename is a single step only within one
+        # filesystem (across filesystems it fails).
+        tmp = gz_path.with_name(gz_path.name + ".tmp")
+
         # Save the raw response as gzip
         # - Raw, not parsed: Bronze keeps exactly what the server sent, so it can be parsed again if
         #   the parsing logic changes later. Turning it into a table (e.g. Parquet) is Silver's job.
@@ -143,9 +156,18 @@ def save_if_changed(response, out_dir, content_hash, manifest_path, fetched_at, 
         #   reads it without extra setup (zcat, pandas, Spark, DuckDB). bz2 is smaller here (about
         #   12 KB) but slower to read; at 19 KB per file the difference does not matter.
         raw = response.content  # the raw bytes from the server, stored as-is (not the parsed data)
-        compressed = gzip.compress(raw)
+        # mtime=0: gzip writes a timestamp into bytes 5-8 of its header, by default the time of
+        # compression, so the same response compressed twice gives different bytes. With 0 there,
+        # the same input always gives the same file, and two copies can be compared with a plain
+        # file hash (sha256sum) without decompressing them or knowing the JSON format. The fetch
+        # time is not lost: it is in the folder and file name.
+        compressed = gzip.compress(raw, mtime=0)
 
-        gz_path.write_bytes(compressed)
+        tmp.write_bytes(compressed)
+        # Path.replace renames in one step (and would overwrite gz_path if it existed), so a reader
+        # sees either no file or the complete file, never a partial one.
+        tmp.replace(gz_path)
+
         print(f'saved {gz_path} ({len(compressed)/1024:.0f} KB)')
 
         # Update the manifest only after the .gz file is written. In the opposite order, a crash
@@ -169,7 +191,7 @@ def save_if_changed(response, out_dir, content_hash, manifest_path, fetched_at, 
         # The manifest is overwritten on purpose: it answers "which copy is the latest?", so only
         # one entry is needed. The history of every run is in fetch_log.jsonl instead.
         manifest_path.write_text(json.dumps(new_manifest, indent=2))
-        print("updated")
+        print("changed")
         log_data["status"] = "changed"
 
     return log_data
