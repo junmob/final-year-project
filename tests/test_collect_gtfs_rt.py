@@ -1,8 +1,27 @@
 from pathlib import Path
 
 import collect_gtfs_rt
+from google.transit import gtfs_realtime_pb2
 
 PB_REL = Path("gtfs_rt/feed=rapid-bus-mrtfeeder/date=2026-10-23/hour=00/20261022T160015Z.pb")
+SLOT_TS = 1792684815
+
+
+def make_feed_body(n_vehicles: int, timestamp: int | None = SLOT_TS) -> bytes:
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.header.gtfs_realtime_version = "2.0"
+    if timestamp is not None:
+        feed.header.timestamp = timestamp
+    for i in range(n_vehicles):
+        entity = feed.entity.add()
+        entity.id = str(i)
+        entity.vehicle.vehicle.id = f"TEST{i}"
+        entity.vehicle.position.latitude = 3.1595798059854743
+        entity.vehicle.position.longitude = 101.71330495332896
+    return feed.SerializeToString()
+
+
+# ===== write_atomic ==========================================================
 
 
 def test_write_atomic_creates_dirs_and_writes_bytes(tmp_path):
@@ -38,3 +57,38 @@ def test_write_atomic_replaces_existing_file(tmp_path):
     collect_gtfs_rt.write_atomic(target, data)
 
     assert target.read_bytes() == data
+
+
+# ===== classify ==========================================================
+
+
+def test_classify_feed_with_vehicles_is_ok():
+    body = make_feed_body(3)
+    assert collect_gtfs_rt.classify(body) == ("ok", 3, SLOT_TS, None)
+
+
+def test_classify_header_without_vehicles_is_ok_empty():
+    body = make_feed_body(0)
+    assert collect_gtfs_rt.classify(body) == ("ok_empty", 0, SLOT_TS, None)
+
+
+# protobuf returns 0 for an unset timestamp, and 0 as a Unix time means
+# 1970-01-01T00:00:00Z. classify() turns it into None with `or None`, so a
+# missing header timestamp is recorded as null instead of a fake 1970 time.
+def test_classify_header_without_timestamp_gives_none():
+    body = make_feed_body(1, timestamp=None)
+    assert collect_gtfs_rt.classify(body) == ("ok", 1, None, None)
+
+
+def test_classify_invalid_bytes_is_parse_error():
+    body = b"not a protobuf"
+    status, entities, header_ts, error = collect_gtfs_rt.classify(body)
+    assert status == "parse_error"
+    assert entities is None
+    assert header_ts is None
+    assert error.startswith("DecodeError:")
+
+
+def test_classify_empty_bytes_is_missing_header():
+    body = b""
+    assert collect_gtfs_rt.classify(body) == ("parse_error", None, None, "missing FeedHeader")
