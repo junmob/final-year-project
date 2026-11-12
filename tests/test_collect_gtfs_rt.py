@@ -1,3 +1,5 @@
+import json
+from datetime import datetime
 from pathlib import Path
 
 import collect_gtfs_rt
@@ -92,3 +94,31 @@ def test_classify_invalid_bytes_is_parse_error():
 def test_classify_empty_bytes_is_missing_header():
     body = b""
     assert collect_gtfs_rt.classify(body) == ("parse_error", None, None, "missing FeedHeader")
+
+
+# ===== write_health ==========================================================
+
+
+def test_write_health_appends_json_lines(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect_gtfs_rt, "HEALTH_DIR", tmp_path / "_health")
+    myt = datetime.fromtimestamp(SLOT_TS, tz=collect_gtfs_rt.MYT)
+    path = tmp_path / "_health" / "feed_health_2026-10-23.jsonl"
+
+    record_1 = {"status": "ok", "feed": "rapid-bus-kl", "latency_ms": 300, "error": None}
+    record_2 = {
+        "status": "parse_error",
+        "feed": "rapid-bus-mrtfeeder",
+        "latency_ms": 400,
+        "error": "missing FeedHeader",
+    }
+
+    collect_gtfs_rt.write_health(record_1, myt)
+    collect_gtfs_rt.write_health(record_2, myt)  # test append mode works
+
+    assert path.exists()
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+
+    assert len(lines) == 2
+    assert json.loads(lines[0]) == record_1
+    assert json.loads(lines[1]) == record_2
