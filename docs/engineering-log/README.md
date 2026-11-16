@@ -25,5 +25,6 @@ An issue with no prior catalogue entry is marked **New finding**.
 
 | # | Date | Module | Version change | What the earlier version could not do | Evidence | Provenance |
 |---|---|---|---|---|---|---|
+| [0001](0001-test-isolation.md) | 2026-11-17 | Collector tests | Avoided before coding (single version) | A `setenv`-only test would write into the git-ignored `data/bronze/` and still pass | PR #1, isolation check `SAME` | Engineering issue; fix suggested by an external AI assistant |
 
 Entry files are named `NNNN-short-title.md` (for example `0001-test-isolation.md`). The template is [`TEMPLATE.md`](TEMPLATE.md).
