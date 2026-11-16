@@ -178,7 +178,7 @@ def test_fetch_slot_429(bronze, monkeypatch):
     monkeypatch.setattr(collect_gtfs_rt.session, "get", fake_get_429)
     record = collect_gtfs_rt.fetch_slot("rapid-bus-mrtfeeder", SLOT_TS)
     assert record["status"] == "rate_limited"
-    assert not (bronze / PB_REL).exists() == []
+    assert list(bronze.rglob("*.pb")) == []
     health_path = bronze / "_health" / "feed_health_2026-10-23.jsonl"
     lines = health_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
