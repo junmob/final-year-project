@@ -1,8 +1,11 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import collect_gtfs_rt
+import pytest
+import requests
 from google.transit import gtfs_realtime_pb2
 
 PB_REL = Path("gtfs_rt/feed=rapid-bus-mrtfeeder/date=2026-10-23/hour=00/20261022T160015Z.pb")
@@ -122,3 +125,61 @@ def test_write_health_appends_json_lines(tmp_path, monkeypatch):
     assert len(lines) == 2
     assert json.loads(lines[0]) == record_1
     assert json.loads(lines[1]) == record_2
+
+
+# ===== fetch_slot ==========================================================
+
+
+@pytest.fixture
+def bronze(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect_gtfs_rt, "BRONZE_DIR", tmp_path)
+    monkeypatch.setattr(collect_gtfs_rt, "RT_DIR", tmp_path / "gtfs_rt")
+    monkeypatch.setattr(collect_gtfs_rt, "HEALTH_DIR", tmp_path / "_health")
+    return tmp_path
+
+
+def test_fetch_slot_200(bronze, monkeypatch):
+    body = make_feed_body(1)
+
+    def fake_get(url, **kwargs):
+        return SimpleNamespace(status_code=200, content=body)
+
+    monkeypatch.setattr(collect_gtfs_rt.session, "get", fake_get)
+    record = collect_gtfs_rt.fetch_slot("rapid-bus-mrtfeeder", SLOT_TS)
+    assert record["status"] == "ok"
+    assert record["file"] == str(PB_REL)
+    data_path = bronze / PB_REL
+    assert data_path.exists()
+    assert data_path.read_bytes() == body
+    health_path = bronze / "_health" / "feed_health_2026-10-23.jsonl"
+    lines = health_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0]) == record
+
+
+def test_fetch_slot_timeout(bronze, monkeypatch):
+    def fake_get_timeout(url, **kwargs):
+        raise requests.Timeout("simulated timeout")
+
+    monkeypatch.setattr(collect_gtfs_rt.session, "get", fake_get_timeout)
+    record = collect_gtfs_rt.fetch_slot("rapid-bus-mrtfeeder", SLOT_TS)
+    assert record["status"] == "timeout"
+    assert list(bronze.rglob("*.pb")) == []
+    health_path = bronze / "_health" / "feed_health_2026-10-23.jsonl"
+    lines = health_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0]) == record
+
+
+def test_fetch_slot_429(bronze, monkeypatch):
+    def fake_get_429(url, **kwargs):
+        return SimpleNamespace(status_code=429, content=b"")
+
+    monkeypatch.setattr(collect_gtfs_rt.session, "get", fake_get_429)
+    record = collect_gtfs_rt.fetch_slot("rapid-bus-mrtfeeder", SLOT_TS)
+    assert record["status"] == "rate_limited"
+    assert not (bronze / PB_REL).exists() == []
+    health_path = bronze / "_health" / "feed_health_2026-10-23.jsonl"
+    lines = health_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0]) == record
